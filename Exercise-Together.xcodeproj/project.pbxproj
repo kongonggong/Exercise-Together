@@ -34,7 +34,6 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
-				"Preview Content/Assets.xcassets",
 			);
 			target = CD7E4B392F7E4C97005F80D5 /* Exercise-Together */;
 		};
