@@ -127,3 +127,9 @@ private struct TabBarItem: View {
     }
 }
 
+// MARK: - Preview
+
+#Preview {
+    ContentView()
+        .preferredColorScheme(.dark)
+}
