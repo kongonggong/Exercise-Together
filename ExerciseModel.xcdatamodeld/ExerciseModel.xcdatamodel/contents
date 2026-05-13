@@ -1,2 +1,49 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="24512" systemVersion="25D2128" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier=""/>
+<model type="com.apple.IDECoreDataModeler.DataModel" documentVersion="1.0" lastSavedToolsVersion="24512" systemVersion="25D2128" minimumToolsVersion="Automatic" sourceLanguage="Swift" usedWithSwiftData="YES" userDefinedModelVersionIdentifier="">
+    <entity name="CDChecklistItem" representedClassName="CDChecklistItem" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="status" optional="YES" attributeType="String"/>
+        <attribute name="title" optional="YES" attributeType="String"/>
+        <relationship name="analysisResults" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="CDFormAnalysisResult" inverseName="checklistItem" inverseEntity="CDFormAnalysisResult"/>
+    </entity>
+    <entity name="CDCompareIssue" representedClassName="CDCompareIssue" syncable="YES" codeGenerationType="class">
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="issueDescriotion" optional="YES" attributeType="String"/>
+        <attribute name="title" optional="YES" attributeType="String"/>
+        <attribute name="type" optional="YES" attributeType="String"/>
+        <relationship name="analysisResults" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="CDFormAnalysisResult" inverseName="compareIssues" inverseEntity="CDFormAnalysisResult"/>
+    </entity>
+    <entity name="CDExercise" representedClassName="CDExercise" syncable="YES" codeGenerationType="class">
+        <attribute name="category" optional="YES" attributeType="String"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="imageName" optional="YES" attributeType="String"/>
+        <attribute name="isSaved" optional="YES" attributeType="Boolean" usesScalarValueType="YES"/>
+        <attribute name="level" optional="YES" attributeType="String"/>
+        <attribute name="name" optional="YES" attributeType="String"/>
+        <attribute name="primaryMuscle" optional="YES" attributeType="String"/>
+        <relationship name="analysisResults" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="CDFormAnalysisResult" inverseName="exercise" inverseEntity="CDFormAnalysisResult"/>
+    </entity>
+    <entity name="CDFormAnalysisResult" representedClassName="CDFormAnalysisResult" syncable="YES" codeGenerationType="class">
+        <attribute name="caloriesBurned" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="date" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="formScore" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="overallScore" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="powerLeakScore" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="stabilityScore" optional="YES" attributeType="Double" defaultValueString="0.0" usesScalarValueType="YES"/>
+        <attribute name="totalReps" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <relationship name="checklistItem" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="CDChecklistItem" inverseName="analysisResults" inverseEntity="CDChecklistItem"/>
+        <relationship name="compareIssues" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="CDCompareIssue" inverseName="analysisResults" inverseEntity="CDCompareIssue"/>
+        <relationship name="exercise" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="CDExercise" inverseName="analysisResults" inverseEntity="CDExercise"/>
+        <relationship name="session" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="CDWorkoutSession" inverseName="analysisResults" inverseEntity="CDWorkoutSession"/>
+    </entity>
+    <entity name="CDWorkoutSession" representedClassName="CDWorkoutSession" syncable="YES" codeGenerationType="class">
+        <attribute name="date" optional="YES" attributeType="Date" usesScalarValueType="NO"/>
+        <attribute name="duration" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <attribute name="icon" optional="YES" attributeType="String"/>
+        <attribute name="id" optional="YES" attributeType="UUID" usesScalarValueType="NO"/>
+        <attribute name="name" optional="YES" attributeType="String"/>
+        <attribute name="volumeLbs" optional="YES" attributeType="Integer 32" defaultValueString="0" usesScalarValueType="YES"/>
+        <relationship name="analysisResults" optional="YES" maxCount="1" deletionRule="Nullify" destinationEntity="CDFormAnalysisResult" inverseName="session" inverseEntity="CDFormAnalysisResult"/>
+    </entity>
+</model>

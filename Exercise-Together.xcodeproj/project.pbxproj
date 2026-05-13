@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		5B1BBD212FB4F30600CD9AEA /* ExerciseModel.xcdatamodeld in Sources */ = {isa = PBXBuildFile; fileRef = 5B1BBD1F2FB4F30600CD9AEA /* ExerciseModel.xcdatamodeld */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		CD7E4B4B2F7E4C98005F80D5 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -24,6 +28,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		5B1BBD202FB4F30600CD9AEA /* ExerciseModel.xcdatamodel */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcdatamodel; path = ExerciseModel.xcdatamodel; sourceTree = "<group>"; };
 		CD7E4B3A2F7E4C97005F80D5 /* Exercise-Together.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Exercise-Together.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CD7E4B4A2F7E4C98005F80D5 /* Exercise-TogetherTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Exercise-TogetherTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		CD7E4B542F7E4C99005F80D5 /* Exercise-TogetherUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "Exercise-TogetherUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -88,6 +93,7 @@
 		CD7E4B312F7E4C97005F80D5 = {
 			isa = PBXGroup;
 			children = (
+				5B1BBD1F2FB4F30600CD9AEA /* ExerciseModel.xcdatamodeld */,
 				CD7E4B3C2F7E4C97005F80D5 /* Exercise-Together */,
 				CD7E4B4D2F7E4C99005F80D5 /* Exercise-TogetherTests */,
 				CD7E4B572F7E4C99005F80D5 /* Exercise-TogetherUITests */,
@@ -249,6 +255,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5B1BBD212FB4F30600CD9AEA /* ExerciseModel.xcdatamodeld in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -573,6 +580,19 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCVersionGroup section */
+		5B1BBD1F2FB4F30600CD9AEA /* ExerciseModel.xcdatamodeld */ = {
+			isa = XCVersionGroup;
+			children = (
+				5B1BBD202FB4F30600CD9AEA /* ExerciseModel.xcdatamodel */,
+			);
+			currentVersion = 5B1BBD202FB4F30600CD9AEA /* ExerciseModel.xcdatamodel */;
+			path = ExerciseModel.xcdatamodeld;
+			sourceTree = "<group>";
+			versionGroupType = wrapper.xcdatamodel;
+		};
+/* End XCVersionGroup section */
 	};
 	rootObject = CD7E4B322F7E4C97005F80D5 /* Project object */;
 }
