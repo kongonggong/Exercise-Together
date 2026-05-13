@@ -7,6 +7,25 @@ import SwiftUI
 import PhotosUI
 import AVKit
 
+private let supportedExercises = [
+    "Push-Ups",
+    "Arm Curls",
+    "Shoulder Press",
+    "Lateral Raises",
+    "Front Raises",
+    "Arm Extensions",
+    "Upright Rows"
+]
+
+private let defaultSupportedExercise = "Push-Ups"
+
+private let upperBodyChecklist = [
+    ChecklistItem(title: "Head-to-Waist Framing", status: .pending),
+    ChecklistItem(title: "Shoulder Alignment", status: .optimal),
+    ChecklistItem(title: "Elbow Tracking", status: .pending),
+    ChecklistItem(title: "Wrist Visibility", status: .optimal)
+]
+
 struct FormAnalysisView: View {
     // State
     @StateObject private var poseEstimator = PoseEstimator()
@@ -16,7 +35,8 @@ struct FormAnalysisView: View {
     @State private var stabilityScore: Int = 78
     @State private var powerLeakScore: Int = 12
     @State private var isTracking: Bool = false
-    @State private var checklist: [ChecklistItem] = ChecklistItem.squatChecklist
+    @State private var checklist: [ChecklistItem] = upperBodyChecklist
+    @State private var selectedExercise: String = defaultSupportedExercise
     
     // Video Processing State
     @State private var selectedVideoItem: PhotosPickerItem?
@@ -34,7 +54,12 @@ struct FormAnalysisView: View {
                     Color.clear.frame(height: 64)
 
                     // ── Page Header ───────────────────────
-                    FormAnalysisHeader(isTracking: isTracking, selectedVideoItem: $selectedVideoItem)
+                    FormAnalysisHeader(
+                        isTracking: isTracking,
+                        selectedExercise: $selectedExercise,
+                        supportedExercises: supportedExercises,
+                        selectedVideoItem: $selectedVideoItem
+                    )
                         .padding(.horizontal, 24)
 
                     // ── Live Camera or Video Viewport ─────
@@ -80,7 +105,10 @@ struct FormAnalysisView: View {
                 }
             }
             .onAppear {
-                poseEstimator.updateCurrentExercise(to: "Squats")
+                applySelectedExercise()
+            }
+            .onChange(of: selectedExercise) { _, _ in
+                applySelectedExercise()
             }
             .onChange(of: selectedVideoItem) { _, newItem in
                 Task {
@@ -89,7 +117,7 @@ struct FormAnalysisView: View {
                             self.selectedVideoURL = videoFile.url
                             self.videoProcessor.loadVideo(url: videoFile.url, poseEstimator: self.poseEstimator)
                             self.isTracking = false
-                            self.poseEstimator.updateCurrentExercise(to: "Squats")
+                            self.applySelectedExercise()
                         }
                     }
                 }
@@ -100,7 +128,7 @@ struct FormAnalysisView: View {
                     formScore: poseEstimator.isGoodForm ? 0.95 : 0.60,
                     caloriesBurned: poseEstimator.caloriesBurned,
                     onReset: {
-                        poseEstimator.updateCurrentExercise(to: "Squats")
+                        applySelectedExercise()
                         isTracking = false
                         selectedVideoURL = nil
                         selectedVideoItem = nil
@@ -112,6 +140,18 @@ struct FormAnalysisView: View {
 
             TopAppBar()
         }
+    }
+
+    private func applySelectedExercise() {
+        let normalizedExercise = supportedExercises.contains(selectedExercise)
+            ? selectedExercise
+            : defaultSupportedExercise
+
+        if selectedExercise != normalizedExercise {
+            selectedExercise = normalizedExercise
+        }
+
+        poseEstimator.updateCurrentExercise(to: normalizedExercise)
     }
     
     private func toggleTracking() {
@@ -142,6 +182,8 @@ struct FormAnalysisView: View {
 
 private struct FormAnalysisHeader: View {
     let isTracking: Bool
+    @Binding var selectedExercise: String
+    let supportedExercises: [String]
     @Binding var selectedVideoItem: PhotosPickerItem?
 
     var body: some View {
@@ -165,22 +207,54 @@ private struct FormAnalysisHeader: View {
                 }
             }
 
-            HStack(spacing: 16) {
-                MetadataLabel(text: "Standard Squat", color: .onSurfaceVariant)
-                
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(isTracking ? Color.tertiary : Color.outline)
-                        .frame(width: 6, height: 6)
-                    MetadataLabel(
-                        text: isTracking ? "Live" : "Standby",
-                        color: isTracking ? .tertiary : .outline
-                    )
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(spacing: 16) {
+                    Menu {
+                        ForEach(supportedExercises, id: \.self) { exercise in
+                            Button {
+                                selectedExercise = exercise
+                            } label: {
+                                if exercise == selectedExercise {
+                                    Label(exercise, systemImage: "checkmark")
+                                } else {
+                                    Text(exercise)
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            MetadataLabel(text: selectedExercise, color: .onSurfaceVariant)
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(.outline)
+                        }
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(Color.containerHigh)
+                        .clipShape(Capsule())
+                    }
+
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(isTracking ? Color.tertiary : Color.outline)
+                            .frame(width: 6, height: 6)
+                        MetadataLabel(
+                            text: isTracking ? "Live" : "Standby",
+                            color: isTracking ? .tertiary : .outline
+                        )
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Color.containerHigh)
+                    .clipShape(Capsule())
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .background(Color.containerHigh)
-                .clipShape(Capsule())
+
+                HStack(spacing: 6) {
+                    Image(systemName: "person.crop.rectangle")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(.outline)
+                    MetadataLabel(text: "Position your body from head to waist within the frame", color: .outline)
+                }
             }
         }
     }
@@ -403,4 +477,3 @@ private struct SmallStat: View {
     FormAnalysisView()
         .preferredColorScheme(.dark)
 }
-
