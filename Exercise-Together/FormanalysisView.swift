@@ -1,11 +1,13 @@
 // =====================================================
 // FormAnalysisView.swift
-// หน้า Form Analysis — วิเคราะห์ฟอร์มแบบ Real-time
+// หน้า Form Analysis — Real-time pose tracking
+// Now saves CDFormAnalysisResult to CoreData on stop
 // =====================================================
 
 import SwiftUI
 import PhotosUI
 import AVKit
+import CoreData
 
 private let supportedExercises = [
     "Push-Ups",
@@ -20,30 +22,39 @@ private let supportedExercises = [
 private let defaultSupportedExercise = "Push-Ups"
 
 private let upperBodyChecklist = [
-    ChecklistItem(title: "Head-to-Waist Framing", status: .pending),
-    ChecklistItem(title: "Shoulder Alignment", status: .optimal),
-    ChecklistItem(title: "Elbow Tracking", status: .pending),
-    ChecklistItem(title: "Wrist Visibility", status: .optimal)
+    ChecklistItem(title: "Head-to-Waist Framing",  status: .pending),
+    ChecklistItem(title: "Shoulder Alignment",      status: .optimal),
+    ChecklistItem(title: "Elbow Tracking",          status: .pending),
+    ChecklistItem(title: "Wrist Visibility",        status: .optimal)
 ]
 
 struct FormAnalysisView: View {
-    // State
-    @StateObject private var poseEstimator = PoseEstimator()
+
+    // MARK: - Core Data
+
+    @Environment(\.managedObjectContext) private var viewContext
+
+    // MARK: - Pose / Video State
+
+    @StateObject private var poseEstimator  = PoseEstimator()
     @StateObject private var videoProcessor = VideoProcessor()
-    
-    @State private var overallScore: Int = 84
-    @State private var stabilityScore: Int = 78
-    @State private var powerLeakScore: Int = 12
-    @State private var isTracking: Bool = false
+
+    @State private var overallScore:   Int  = 84
+    @State private var stabilityScore: Int  = 78
+    @State private var powerLeakScore: Int  = 12
+    @State private var isTracking:     Bool = false
     @State private var checklist: [ChecklistItem] = upperBodyChecklist
-    @State private var selectedExercise: String = defaultSupportedExercise
-    
-    // Video Processing State
+    @State private var selectedExercise: String   = defaultSupportedExercise
+
+    // Video
     @State private var selectedVideoItem: PhotosPickerItem?
-    @State private var selectedVideoURL: URL?
-    
-    // Summary State
-    @State private var showSummary: Bool = false
+    @State private var selectedVideoURL:  URL?
+
+    // Summary sheet
+    @State private var showSummary:    Bool = false
+    @State private var savedResultID:  UUID?
+
+    // MARK: - Body
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -53,16 +64,14 @@ struct FormAnalysisView: View {
                 VStack(alignment: .leading, spacing: 32) {
                     Color.clear.frame(height: 64)
 
-                    // ── Page Header ───────────────────────
                     FormAnalysisHeader(
                         isTracking: isTracking,
                         selectedExercise: $selectedExercise,
                         supportedExercises: supportedExercises,
                         selectedVideoItem: $selectedVideoItem
                     )
-                        .padding(.horizontal, 24)
+                    .padding(.horizontal, 24)
 
-                    // ── Live Camera or Video Viewport ─────
                     CameraViewport(
                         isTracking: $isTracking,
                         poseEstimator: poseEstimator,
@@ -70,11 +79,9 @@ struct FormAnalysisView: View {
                         selectedVideoURL: selectedVideoURL
                     )
                     .padding(.horizontal, 24)
-                    
-                    // ── Oversized Track Button ────────────
-                    Button(action: {
-                        toggleTracking()
-                    }) {
+
+                    // Track Button
+                    Button { toggleTracking() } label: {
                         Text(isTracking ? "STOP TRACKING" : "START TRACKING")
                             .font(.system(size: 18, weight: .black))
                             .tracking(1.5)
@@ -83,17 +90,13 @@ struct FormAnalysisView: View {
                             .padding(.vertical, 18)
                             .background(isTracking ? Color.red.opacity(0.15) : Color(hex: "#00E5FF"))
                             .clipShape(Capsule())
-                            .overlay(
-                                Capsule().stroke(isTracking ? Color.red : Color(hex: "#00E5FF"), lineWidth: 2)
-                            )
+                            .overlay(Capsule().stroke(isTracking ? Color.red : Color(hex: "#00E5FF"), lineWidth: 2))
                     }
                     .padding(.horizontal, 24)
 
-                    // ── Execution Checklist ───────────────
                     ExecutionChecklist(items: checklist)
                         .padding(.horizontal, 24)
 
-                    // ── Score Summary Card ────────────────
                     ScoreSummaryCard(
                         overallScore: poseEstimator.isGoodForm ? overallScore : max(0, overallScore - 20),
                         stabilityScore: stabilityScore,
@@ -104,12 +107,8 @@ struct FormAnalysisView: View {
                     Color.clear.frame(height: 32)
                 }
             }
-            .onAppear {
-                applySelectedExercise()
-            }
-            .onChange(of: selectedExercise) { _, _ in
-                applySelectedExercise()
-            }
+            .onAppear { applySelectedExercise() }
+            .onChange(of: selectedExercise) { _, _ in applySelectedExercise() }
             .onChange(of: selectedVideoItem) { _, newItem in
                 Task {
                     if let videoFile = try? await newItem?.loadTransferable(type: VideoTransferable.self) {
@@ -129,8 +128,8 @@ struct FormAnalysisView: View {
                     caloriesBurned: poseEstimator.caloriesBurned,
                     onReset: {
                         applySelectedExercise()
-                        isTracking = false
-                        selectedVideoURL = nil
+                        isTracking      = false
+                        selectedVideoURL  = nil
                         selectedVideoItem = nil
                         videoProcessor.stop()
                     }
@@ -142,38 +141,65 @@ struct FormAnalysisView: View {
         }
     }
 
+    // MARK: - Helpers
+
     private func applySelectedExercise() {
-        let normalizedExercise = supportedExercises.contains(selectedExercise)
-            ? selectedExercise
-            : defaultSupportedExercise
-
-        if selectedExercise != normalizedExercise {
-            selectedExercise = normalizedExercise
-        }
-
-        poseEstimator.updateCurrentExercise(to: normalizedExercise)
+        let normalized = supportedExercises.contains(selectedExercise)
+            ? selectedExercise : defaultSupportedExercise
+        if selectedExercise != normalized { selectedExercise = normalized }
+        poseEstimator.updateCurrentExercise(to: normalized)
     }
-    
+
     private func toggleTracking() {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             if isTracking {
-                // STOP recording
                 isTracking = false
                 poseEstimator.stopCount()
                 if selectedVideoURL != nil { videoProcessor.stop() }
-                
-                // Show summary
+
+                // ── Save result to CoreData ──────────────
+                saveAnalysisResult()
+
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     showSummary = true
                 }
             } else {
-                // START recording
                 isTracking = true
                 poseEstimator.startCount()
-                if selectedVideoURL != nil {
-                    videoProcessor.play()
-                }
+                if selectedVideoURL != nil { videoProcessor.play() }
             }
+        }
+    }
+
+    // MARK: - CoreData Save
+
+    private func saveAnalysisResult() {
+        let result = CDFormAnalysisResult(context: viewContext)
+        result.id              = UUID()
+        result.date            = Date()
+        result.totalReps       = Int32(poseEstimator.exerciseCount)
+        result.caloriesBurned  = poseEstimator.caloriesBurned
+        result.formScore       = poseEstimator.isGoodForm ? 0.95 : 0.60
+        result.overallScore    = poseEstimator.isGoodForm ? Double(overallScore) : Double(max(0, overallScore - 20))
+        result.stabilityScore  = Double(stabilityScore) / 100.0
+        result.powerLeakScore  = Double(powerLeakScore) / 100.0
+
+        // Also create a linked WorkoutSession
+        let session        = CDWorkoutSession(context: viewContext)
+        session.id         = UUID()
+        session.name       = selectedExercise
+        session.date       = Date()
+        session.duration   = 30   // placeholder — replace with real timer if added
+        session.volumeLbs  = 0
+        session.icon       = "figure.strengthtraining.traditional"
+        result.session     = session
+
+        do {
+            try viewContext.save()
+            savedResultID = result.id
+            print("✅ Saved FormAnalysisResult to CoreData")
+        } catch {
+            print("❌ CoreData save error: \(error.localizedDescription)")
         }
     }
 }
@@ -196,7 +222,6 @@ private struct FormAnalysisHeader: View {
 
                 Spacer()
 
-                // Photos Picker
                 PhotosPicker(selection: $selectedVideoItem, matching: .videos) {
                     Image(systemName: "photo.on.rectangle.angled")
                         .font(.system(size: 18))
@@ -270,7 +295,6 @@ private struct CameraViewport: View {
 
     var body: some View {
         ZStack {
-            // Camera / Video feed placeholder
             RoundedRectangle(cornerRadius: 16)
                 .fill(Color.containerLowest)
                 .frame(height: 320)
@@ -278,7 +302,7 @@ private struct CameraViewport: View {
                     Group {
                         if selectedVideoURL != nil {
                             VideoPlayer(player: videoProcessor.player)
-                                .disabled(true) // Just display
+                                .disabled(true)
                         } else if isTracking {
                             CameraViewWrapper(poseEstimator: poseEstimator)
                         } else {
@@ -287,7 +311,6 @@ private struct CameraViewport: View {
                     }
                 )
 
-            // Dynamic Form Feedback overlay (Top Right)
             VStack {
                 HStack {
                     Spacer()
@@ -305,7 +328,6 @@ private struct CameraViewport: View {
                 Spacer()
             }
 
-            // Rep Counter Overlay (Center)
             if isTracking || poseEstimator.exerciseCount > 0 {
                 VStack {
                     Spacer()
@@ -326,31 +348,28 @@ private struct CameraViewport: View {
     }
 }
 
-// ── Simple skeleton/joint overlay ─────────────────────
+// ── Skeleton Overlay ───────────────────────────────────
 
 private struct SkeletonOverlay: View {
     var body: some View {
         GeometryReader { geo in
             let w = geo.size.width
             let h = geo.size.height
-
-            // Joint positions (% of frame)
             let joints: [(x: CGFloat, y: CGFloat)] = [
                 (0.50, 0.12), (0.50, 0.28), (0.38, 0.30),
                 (0.62, 0.30), (0.50, 0.46), (0.40, 0.60),
                 (0.60, 0.60), (0.40, 0.78), (0.60, 0.78)
             ]
-
             Path { path in
-                path.move(to: CGPoint(x: w * 0.50, y: h * 0.12))
+                path.move(to:    CGPoint(x: w * 0.50, y: h * 0.12))
                 path.addLine(to: CGPoint(x: w * 0.50, y: h * 0.46))
-                path.move(to: CGPoint(x: w * 0.50, y: h * 0.46))
+                path.move(to:    CGPoint(x: w * 0.50, y: h * 0.46))
                 path.addLine(to: CGPoint(x: w * 0.40, y: h * 0.60))
                 path.addLine(to: CGPoint(x: w * 0.40, y: h * 0.78))
-                path.move(to: CGPoint(x: w * 0.50, y: h * 0.46))
+                path.move(to:    CGPoint(x: w * 0.50, y: h * 0.46))
                 path.addLine(to: CGPoint(x: w * 0.60, y: h * 0.60))
                 path.addLine(to: CGPoint(x: w * 0.60, y: h * 0.78))
-                path.move(to: CGPoint(x: w * 0.38, y: h * 0.30))
+                path.move(to:    CGPoint(x: w * 0.38, y: h * 0.30))
                 path.addLine(to: CGPoint(x: w * 0.62, y: h * 0.30))
             }
             .stroke(Color.primary.opacity(0.4), lineWidth: 1.5)
@@ -393,20 +412,16 @@ private struct ExecutionChecklist: View {
 
 private struct ChecklistRow: View {
     let item: ChecklistItem
-
     var body: some View {
         HStack(spacing: 14) {
             Image(systemName: item.status.icon)
                 .font(.system(size: 18, weight: .light))
                 .foregroundColor(item.status.color)
                 .frame(width: 24)
-
             Text(item.title)
                 .font(.system(size: 14, weight: .bold))
                 .foregroundColor(.onSurface)
-
             Spacer()
-
             MetadataLabel(text: item.status.label, color: item.status.color)
         }
         .padding(.horizontal, 16)
@@ -436,12 +451,10 @@ private struct ScoreSummaryCard: View {
                     }
                     MetadataLabel(text: "Overall Score")
                 }
-
                 Spacer()
-
                 VStack(alignment: .trailing, spacing: 20) {
-                    SmallStat(label: "Stability",   value: "\(stabilityScore)%", color: .onSurface)
-                    SmallStat(label: "Power Leak",  value: "\(powerLeakScore)%", color: .tertiary)
+                    SmallStat(label: "Stability",  value: "\(stabilityScore)%",  color: .onSurface)
+                    SmallStat(label: "Power Leak", value: "\(powerLeakScore)%",  color: .tertiary)
                 }
             }
             .padding(24)
@@ -452,8 +465,17 @@ private struct ScoreSummaryCard: View {
                     .stroke(Color.outlineVariant.opacity(0.15), lineWidth: 1)
             )
 
-            PrimaryButton(title: "Generate Drill Plan") {
+            NavigationLink(destination: DrillPlanView(exerciseName: "Push-Ups", formScore: Double(overallScore) / 100.0)) {
+                Text("GENERATE DRILL PLAN")
+                    .font(PerformanceTextStyle.labelSmall)
+                    .tracking(1.5)
+                    .foregroundColor(Color(hex: "#002957"))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 16)
+                    .background(LinearGradient.primaryGradient)
+                    .clipShape(Capsule())
             }
+            .buttonStyle(ScaleButtonStyle())
         }
     }
 }
@@ -462,7 +484,6 @@ private struct SmallStat: View {
     let label: String
     let value: String
     var color: Color = .onSurface
-
     var body: some View {
         VStack(alignment: .trailing, spacing: 2) {
             MetadataLabel(text: label, color: .outline)
@@ -473,7 +494,12 @@ private struct SmallStat: View {
     }
 }
 
+// MARK: - Preview
+
 #Preview {
-    FormAnalysisView()
-        .preferredColorScheme(.dark)
+    NavigationStack {
+        FormAnalysisView()
+            .environment(\.managedObjectContext, PersistenceController.preview.container.viewContext)
+            .preferredColorScheme(.dark)
+    }
 }

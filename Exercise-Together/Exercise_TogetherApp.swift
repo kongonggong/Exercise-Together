@@ -2,16 +2,24 @@
 //  Exercise_TogetherApp.swift
 //  Exercise-Together
 //
-//  Created by P W on 2/4/26.
-//
 
 import SwiftUI
+import CoreData
 
 @main
 struct Exercise_TogetherApp: App {
+
+    let persistenceController = PersistenceController.shared
+
     var body: some Scene {
+
         WindowGroup {
+
             ContentView()
+                .environment(
+                    \.managedObjectContext,
+                    persistenceController.container.viewContext
+                )
         }
     }
 }

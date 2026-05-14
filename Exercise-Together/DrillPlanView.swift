@@ -1,0 +1,509 @@
+//
+//  DrillPlanView.swift
+//  Exercise-Together
+//
+//  Destination for:
+//  - FormAnalysisView → "Generate Drill Plan"
+//  - CompareView      → "Generate Correction Plan"
+//  Place in: Views/
+//
+
+import SwiftUI
+
+// =====================================================
+// MARK: - Drill Model
+// =====================================================
+
+private struct DrillItem: Identifiable {
+    let id = UUID()
+    let phase: String
+    let name: String
+    let sets: Int
+    let reps: String
+    let focus: String
+    let icon: String
+    let priority: DrillPriority
+}
+
+private enum DrillPriority {
+    case critical, moderate, maintenance
+
+    var color: Color {
+        switch self {
+        case .critical:    return Color(hex: "#FF6B6B")
+        case .moderate:    return .tertiary
+        case .maintenance: return .primary
+        }
+    }
+
+    var label: String {
+        switch self {
+        case .critical:    return "Critical"
+        case .moderate:    return "Moderate"
+        case .maintenance: return "Maintenance"
+        }
+    }
+}
+
+// Sample drill plan data
+private let sampleDrills: [DrillItem] = [
+    DrillItem(
+        phase: "Activation",
+        name: "Glute Bridge Hold",
+        sets: 3, reps: "30 sec",
+        focus: "Posterior chain activation before compound loading",
+        icon: "figure.flexibility",
+        priority: .critical
+    ),
+    DrillItem(
+        phase: "Activation",
+        name: "Band Pull-Apart",
+        sets: 3, reps: "15",
+        focus: "Shoulder retraction and external rotation cue",
+        icon: "figure.arms.open",
+        priority: .moderate
+    ),
+    DrillItem(
+        phase: "Drill",
+        name: "Goblet Squat",
+        sets: 4, reps: "8",
+        focus: "Knee tracking and upright torso reinforcement",
+        icon: "figure.strengthtraining.traditional",
+        priority: .critical
+    ),
+    DrillItem(
+        phase: "Drill",
+        name: "Box Squat Pause",
+        sets: 4, reps: "5",
+        focus: "Hip crease depth consistency at controlled tempo",
+        icon: "figure.strengthtraining.functional",
+        priority: .moderate
+    ),
+    DrillItem(
+        phase: "Drill",
+        name: "Romanian Deadlift",
+        sets: 3, reps: "10",
+        focus: "Hip hinge mechanics and hamstring engagement",
+        icon: "figure.gymnastics",
+        priority: .moderate
+    ),
+    DrillItem(
+        phase: "Mobility",
+        name: "Couch Stretch",
+        sets: 2, reps: "90 sec",
+        focus: "Hip flexor lengthening — reduces anterior pelvic tilt",
+        icon: "figure.yoga",
+        priority: .maintenance
+    ),
+    DrillItem(
+        phase: "Mobility",
+        name: "Ankle Dorsiflexion",
+        sets: 2, reps: "60 sec",
+        focus: "Improve squat depth without heel elevation",
+        icon: "figure.walk",
+        priority: .maintenance
+    ),
+]
+
+// =====================================================
+// MARK: - Main View
+// =====================================================
+
+struct DrillPlanView: View {
+
+    @Environment(\.dismiss) private var dismiss
+
+    // Plan metadata
+    let exerciseName: String
+    let formScore: Double
+    let issueCount: Int
+
+    // Group drills by phase
+    private var phases: [(String, [DrillItem])] {
+        var result: [(String, [DrillItem])] = []
+        var seen: [String: Int] = [:]
+        for drill in sampleDrills {
+            if let idx = seen[drill.phase] {
+                result[idx].1.append(drill)
+            } else {
+                seen[drill.phase] = result.count
+                result.append((drill.phase, [drill]))
+            }
+        }
+        return result
+    }
+
+    // ปรับปรุง Initializer ให้รับ Double
+    init(
+        exerciseName: String = "Barbell Squat",
+        formScore: Double = 0.70, // รับเป็น 0.0 - 1.0
+        issueCount: Int = 2
+    ) {
+        self.exerciseName = exerciseName
+        self.formScore = formScore
+        self.issueCount = issueCount
+    }
+
+    // MARK: - Body
+
+    var body: some View {
+
+        ZStack(alignment: .top) {
+
+            Color.surface.ignoresSafeArea()
+
+            ScrollView(showsIndicators: false) {
+
+                VStack(alignment: .leading, spacing: 0) {
+
+                    Color.clear.frame(height: 64)
+
+                    // ── Header ─────────────────────────
+                    headerSection
+                        .padding(.horizontal, 24)
+                        .padding(.top, 24)
+
+                    // ── Plan Overview Card ─────────────
+                    planOverviewCard
+                        .padding(.horizontal, 24)
+                        .padding(.top, 24)
+
+                    // ── Drills by Phase ────────────────
+                    VStack(alignment: .leading, spacing: 28) {
+
+                        ForEach(phases, id: \.0) { phase, drills in
+
+                            PhaseSection(phase: phase, drills: drills)
+                        }
+                    }
+                    .padding(.top, 28)
+
+                    // ── Save CTA ───────────────────────
+                    PrimaryButton(title: "Save to My Plan") {}
+                        .padding(.horizontal, 24)
+                        .padding(.top, 32)
+
+                    Color.clear.frame(height: 48)
+                }
+            }
+
+            // Top Bar
+            drillTopBar
+        }
+    }
+}
+
+// =====================================================
+// MARK: - Sections
+// =====================================================
+
+extension DrillPlanView {
+
+    // MARK: Top Bar
+
+    private var drillTopBar: some View {
+
+        HStack {
+
+            Button { dismiss() } label: {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 18, weight: .light))
+                    .foregroundColor(.outline)
+                    .frame(width: 40, height: 40)
+                    .background(Color.containerLow)
+                    .clipShape(Circle())
+            }
+
+            Spacer()
+
+            HStack(spacing: 10) {
+                Circle()
+                    .fill(Color.containerHighest)
+                    .frame(width: 32, height: 32)
+                    .overlay(
+                        Image(systemName: "figure.strengthtraining.traditional")
+                            .font(.system(size: 14, weight: .light))
+                            .foregroundColor(.primary)
+                    )
+
+                Text("PERFORMANCE LAB")
+                    .font(.system(size: 15, weight: .black))
+                    .tracking(1)
+                    .foregroundColor(.primary)
+            }
+
+            Spacer()
+
+            Color.clear.frame(width: 40, height: 40)
+        }
+        .padding(.horizontal, 24)
+        .frame(height: 64)
+        .background(
+            Color.surface.opacity(0.8)
+                .background(.ultraThinMaterial)
+                .ignoresSafeArea()
+        )
+    }
+
+    // MARK: Header
+
+    private var headerSection: some View {
+
+        VStack(alignment: .leading, spacing: 6) {
+
+            MetadataLabel(text: exerciseName, color: .primary)
+                .tracking(2)
+
+            Text("Correction\nDrill Plan")
+                .font(.system(size: 48, weight: .black))
+                .tracking(-1.5)
+                .foregroundColor(.onSurface)
+                .lineSpacing(2)
+
+            MetadataLabel(
+                text: "\(sampleDrills.count) drills · \(issueCount) issues targeted",
+                color: .outline
+            )
+            .tracking(2)
+            .padding(.top, 4)
+        }
+    }
+
+    // MARK: Plan Overview Card
+
+    private var planOverviewCard: some View {
+
+        HStack(spacing: 0) {
+
+            OverviewStat(
+                label: "Form Score",
+                value: "\(Int(formScore * 100))%", // แปลงจาก 0.7 เป็น 70%
+                icon: "checkmark.seal.fill",
+                color: scoreColor
+            )
+
+            Divider()
+                .background(Color.outlineVariant.opacity(0.2))
+                .padding(.vertical, 16)
+
+            OverviewStat(
+                label: "Issues",
+                value: "\(issueCount)",
+                icon: "exclamationmark.triangle.fill",
+                color: .tertiary
+            )
+
+            Divider()
+                .background(Color.outlineVariant.opacity(0.2))
+                .padding(.vertical, 16)
+
+            OverviewStat(
+                label: "Drills",
+                value: "\(sampleDrills.count)",
+                icon: "list.bullet.clipboard.fill",
+                color: .primary
+            )
+        }
+        .padding(.vertical, 8)
+        .background(Color.containerLow)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+    }
+
+    private var scoreColor: Color {
+        let scorePercent = formScore * 100
+        if scorePercent >= 85 { return .primary }
+        if scorePercent >= 65 { return .tertiary }
+        return Color(hex: "#FF6B6B")
+    }
+}
+
+// =====================================================
+// MARK: - Overview Stat
+// =====================================================
+
+private struct OverviewStat: View {
+
+    let label: String
+    let value: String
+    let icon: String
+    let color: Color
+
+    var body: some View {
+
+        VStack(spacing: 8) {
+
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .light))
+                .foregroundColor(color)
+
+            Text(value)
+                .font(.system(size: 24, weight: .black))
+                .foregroundColor(.onSurface)
+
+            MetadataLabel(text: label, color: .outline)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+    }
+}
+
+// =====================================================
+// MARK: - Phase Section
+// =====================================================
+
+private struct PhaseSection: View {
+
+    let phase: String
+    let drills: [DrillItem]
+
+    var body: some View {
+
+        VStack(alignment: .leading, spacing: 12) {
+
+            // Phase label
+            HStack(spacing: 10) {
+
+                Rectangle()
+                    .fill(phaseColor)
+                    .frame(width: 3, height: 16)
+                    .clipShape(Capsule())
+
+                MetadataLabel(text: phase, color: phaseColor)
+                    .tracking(2)
+            }
+            .padding(.horizontal, 24)
+
+            // Drill cards
+            VStack(spacing: 10) {
+                ForEach(drills) { drill in
+                    DrillCard(drill: drill)
+                        .padding(.horizontal, 24)
+                }
+            }
+        }
+    }
+
+    private var phaseColor: Color {
+        switch phase {
+        case "Activation": return .primary
+        case "Drill":      return .tertiary
+        default:           return Color(hex: "#4CAF82")
+        }
+    }
+}
+
+// =====================================================
+// MARK: - Drill Card
+// =====================================================
+
+private struct DrillCard: View {
+
+    let drill: DrillItem
+    @State private var expanded = false
+
+    var body: some View {
+
+        VStack(alignment: .leading, spacing: 0) {
+
+            // ── Main Row ──────────────────────────
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                    expanded.toggle()
+                }
+            } label: {
+
+                HStack(spacing: 14) {
+
+                    // Icon
+                    ZStack {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color.containerHigh)
+                            .frame(width: 46, height: 46)
+
+                        Image(systemName: drill.icon)
+                            .font(.system(size: 18, weight: .light))
+                            .foregroundColor(drill.priority.color)
+                    }
+
+                    // Name + sets×reps
+                    VStack(alignment: .leading, spacing: 4) {
+
+                        Text(drill.name)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundColor(.onSurface)
+
+                        HStack(spacing: 8) {
+
+                            MetadataLabel(
+                                text: "\(drill.sets) sets × \(drill.reps)",
+                                color: .onSurfaceVariant
+                            )
+
+                            Text("·")
+                                .foregroundColor(.outline)
+
+                            Text(drill.priority.label)
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(drill.priority.color)
+                        }
+                    }
+
+                    Spacer()
+
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(.outline)
+                }
+                .padding(14)
+            }
+            .buttonStyle(ScaleButtonStyle())
+
+            // ── Expanded Focus Detail ─────────────
+            if expanded {
+
+                Color.outlineVariant.opacity(0.15)
+                    .frame(height: 1)
+                    .padding(.horizontal, 14)
+
+                HStack(spacing: 10) {
+
+                    Image(systemName: "scope")
+                        .font(.system(size: 12, weight: .light))
+                        .foregroundColor(.outline)
+
+                    Text(drill.focus)
+                        .font(.system(size: 12, weight: .regular))
+                        .foregroundColor(.onSurfaceVariant)
+                        .lineSpacing(4)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(14)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .background(Color.containerLow)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay(
+            RoundedRectangle(cornerRadius: 14)
+                .stroke(
+                    expanded
+                    ? drill.priority.color.opacity(0.2)
+                    : Color.white.opacity(0.04),
+                    lineWidth: 1
+                )
+        )
+    }
+}
+
+// =====================================================
+// MARK: - Preview
+// =====================================================
+
+#Preview {
+    DrillPlanView(
+        exerciseName: "Barbell Squat",
+        formScore: 0.70,
+        issueCount: 2
+    )
+    .preferredColorScheme(.dark)
+}
