@@ -18,15 +18,9 @@ struct LibraryView: View {
     private var viewContext
 
     @FetchRequest(
-        sortDescriptors: [
-            NSSortDescriptor(
-                keyPath: \CDExercise.name,
-                ascending: true
-            )
-        ],
-        animation: .default
-    )
-    private var exercises: FetchedResults<CDExercise>
+        sortDescriptors: [SortDescriptor(\CDExercise.name)]
+    ) private var exercises: FetchedResults<CDExercise>
+
 
     // MARK: - State
 
@@ -111,9 +105,7 @@ struct LibraryView: View {
                     trailingAction: { showAddSheet = true }
                 )
             }
-            .onAppear {
-                seedExercisesIfNeeded()
-            }
+            
             .sheet(isPresented: $showAddSheet) {
                 AddExerciseView(
                     onAdd: { name, category, muscle, level in
@@ -161,37 +153,6 @@ extension LibraryView {
         } catch {
 
             print(error.localizedDescription)
-        }
-    }
-
-    // MARK: - Seed Initial Data
-
-    func seedExercisesIfNeeded() {
-
-        if exercises.isEmpty {
-
-            let seedData: [(String, String, String, String)] = [
-                ("Barbell Squat",  "Compounds",  "Quadriceps",    "Advanced"),
-                ("Bench Press",    "Compounds",  "Pectorals",     "Intermediate"),
-                ("Deadlift",       "Compounds",  "Posterior",     "Expert"),
-                ("Pull Up",        "Compounds",  "Latissimus",    "Intermediate"),
-                ("Bicep Curl",     "Isolations", "Biceps",        "Beginner"),
-                ("Lateral Raise",  "Isolations", "Deltoids",      "Beginner"),
-                ("Push Up",        "Compounds",  "Pectorals",     "Beginner"),
-                ("Running",        "Cardio",     "Full Body",     "Beginner"),
-            ]
-
-            for (name, category, muscle, level) in seedData {
-                addExercise(
-                    name: name,
-                    category: category,
-                    primaryMuscle: muscle,
-                    level: level,
-                    imageName: name
-                        .lowercased()
-                        .replacingOccurrences(of: " ", with: "_")
-                )
-            }
         }
     }
 

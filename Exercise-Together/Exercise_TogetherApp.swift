@@ -11,6 +11,13 @@ struct Exercise_TogetherApp: App {
 
     let persistenceController = PersistenceController.shared
 
+    init() {
+
+        ExerciseSeeder.seed(
+            context: persistenceController.container.viewContext
+        )
+    }
+
     var body: some Scene {
 
         WindowGroup {

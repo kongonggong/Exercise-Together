@@ -1,67 +1,121 @@
-//
-//  ExerciseSeeder.swift
-//  Exercise-Together
-//
-//  Created by Sanpon Soontornnon on 14/5/2569 BE.
-//
-
 import CoreData
 
 struct ExerciseSeeder {
 
-    static func seed(
-        context: NSManagedObjectContext
-    ) {
+    static func seed(context: NSManagedObjectContext) {
 
         let request: NSFetchRequest<CDExercise> =
             CDExercise.fetchRequest()
 
+        let count = (try? context.count(for: request)) ?? 0
+
+        if count > 0 {
+            return
+        }
+
+        let exercises: [(String, String, String, String, String)] = [
+
+            (
+                "Curl Forearm",
+                "Isolations",
+                "Forearm",
+                "Beginner",
+                "2-Curl_Forearm"
+            ),
+
+            (
+                "Curl Upper Arms",
+                "Isolations",
+                "Biceps",
+                "Beginner",
+                "2-Curl_Upper-Arms"
+            ),
+
+            (
+                "Shoulders",
+                "Isolations",
+                "Shoulders",
+                "Intermediate",
+                "3-Shoulders"
+            ),
+
+            (
+                "Lateral Raise",
+                "Isolations",
+                "Shoulders",
+                "Beginner",
+                "4-Lateral-Raise-"
+            ),
+
+            (
+                "Front Raise",
+                "Isolations",
+                "Shoulders",
+                "Beginner",
+                "5-Front-Raise"
+            ),
+
+            (
+                "Arm Triceps Extension",
+                "Isolations",
+                "Triceps",
+                "Intermediate",
+                "6-Arm-Triceps-Extension"
+            ),
+
+            (
+                "Overhead Triceps Extension",
+                "Isolations",
+                "Triceps",
+                "Intermediate",
+                "6-Overhead-Triceps-Extension"
+            ),
+
+            (
+                "Incline Row",
+                "Compounds",
+                "Back",
+                "Intermediate",
+                "7-Incline-Row_Back"
+            ),
+
+            (
+                "Inverted Row",
+                "Compounds",
+                "Back",
+                "Intermediate",
+                "7-Inverted-Row_Back"
+            ),
+
+            (
+                "Pull Up",
+                "Compounds",
+                "Back",
+                "Advanced",
+                "Pull-up_Back"
+            )
+        ]
+
+        for item in exercises {
+
+            let exercise = CDExercise(context: context)
+
+            exercise.id = UUID()
+            exercise.name = item.0
+            exercise.category = item.1
+            exercise.primaryMuscle = item.2
+            exercise.level = item.3
+
+            // ใช้เก็บชื่อ video
+            exercise.imageName = item.4
+
+            exercise.isSaved = false
+        }
+
         do {
 
-            let count =
-                try context.count(for: request)
-
-            // ถ้ามีข้อมูลแล้ว ไม่ต้อง seed ซ้ำ
-            if count > 0 {
-                return
-            }
-
-            // MARK: - Exercise 1
-
-            let bench =
-                CDExercise(context: context)
-
-            bench.name = "Bench Press"
-            bench.category = "Chest"
-            bench.level = "Intermediate"
-            bench.primaryMuscle = "Pectorals"
-            bench.isSaved = false
-
-            // MARK: - Exercise 2
-
-            let squat =
-                CDExercise(context: context)
-
-            squat.name = "Squat"
-            squat.category = "Legs"
-            squat.level = "Beginner"
-            squat.primaryMuscle = "Quadriceps"
-            squat.isSaved = true
-
-            // MARK: - Exercise 3
-
-            let deadlift =
-                CDExercise(context: context)
-
-            deadlift.name = "Deadlift"
-            deadlift.category = "Back"
-            deadlift.level = "Advanced"
-            deadlift.primaryMuscle = "Hamstrings"
-            deadlift.isSaved = false
-
             try context.save()
-
-            print("✅ Seeded Exercises")
+            print("Seeder Success")
 
         } catch {
 

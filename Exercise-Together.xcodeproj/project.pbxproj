@@ -54,6 +54,11 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
+		5BC071672FB7792F00B2EBA6 /* Resources */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		CD7E4B3C2F7E4C97005F80D5 /* Exercise-Together */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
@@ -112,6 +117,7 @@
 		CD7E4B312F7E4C97005F80D5 = {
 			isa = PBXGroup;
 			children = (
+				5BC071672FB7792F00B2EBA6 /* Resources */,
 				5B1BBD252FB4F87800CD9AEA /* Views */,
 				5B1BBD222FB4F6CD00CD9AEA /* CoreData */,
 				CD7E4B3C2F7E4C97005F80D5 /* Exercise-Together */,
@@ -148,6 +154,7 @@
 			);
 			fileSystemSynchronizedGroups = (
 				5B1BBD252FB4F87800CD9AEA /* Views */,
+				5BC071672FB7792F00B2EBA6 /* Resources */,
 				CD7E4B3C2F7E4C97005F80D5 /* Exercise-Together */,
 			);
 			name = "Exercise-Together";
