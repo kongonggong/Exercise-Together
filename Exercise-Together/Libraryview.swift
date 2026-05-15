@@ -68,7 +68,7 @@ struct LibraryView: View {
                     VStack(alignment: .leading, spacing: 0) {
 
                         Color.clear
-                            .frame(height: 64)
+                            .frame(height: 104)
 
                         // Header
                         LibraryHeaderSection()
@@ -95,7 +95,7 @@ struct LibraryView: View {
                         .padding(.top, 24)
 
                         Color.clear
-                            .frame(height: 32)
+                            .frame(height: 132)
                     }
                 }
 
@@ -417,6 +417,9 @@ private struct ExerciseCard: View {
                             )
                         )
                         .foregroundColor(.onSurface)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.78)
+                        .allowsTightening(true)
                 }
                 .padding(16)
             }
@@ -515,6 +518,8 @@ private struct LabeledValue: View {
                     )
                 )
                 .foregroundColor(.onSurface)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
         }
     }
 }

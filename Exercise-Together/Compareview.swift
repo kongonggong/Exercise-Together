@@ -71,79 +71,145 @@ class PlayerState: NSObject, ObservableObject {
 }
 
 struct CompareView: View {
+    private let initialReferenceVideoName: String?
+    private let referenceTitle: String
+
     // State
-    @State private var formAccuracy: Int = 84
-    @State private var syncOffset: Double = -0.24     // milliseconds
-    @State private var angleDeviation: Double = 12.4  // degrees
+    @State private var formAccuracy: Int = 0
+    @State private var syncOffset: Double = 0.0     // milliseconds
+    @State private var angleDeviation: Double = 0.0  // degrees
     @State private var isPlaying: Bool = false
-    @State private var expertProgress: Double = 0.38
-    @State private var userProgress: Double = 0.38
-    @State private var issues: [CompareIssue] = CompareIssue.squatIssues
+    @State private var expertProgress: Double = 0.0
+    @State private var userProgress: Double = 0.0
+    @State private var issues: [CompareIssue] = []
+    @State private var isAnalyzing: Bool = false
+    @State private var analysisTask: Task<Void, Never>?
     
     // Video picker states
-    @State private var expertVideoSelection: PhotosPickerItem?
     @State private var userVideoSelection: PhotosPickerItem?
     @State private var expertVideoURL: URL?
     @State private var userVideoURL: URL?
-    @State private var showExpertPicker: Bool = false
     @State private var showUserPicker: Bool = false
+    @State private var showCorrectionPlan: Bool = false
     
     // Settings
     @State private var showSettings: Bool = false
 
+    init(
+        referenceVideoName: String? = "biceps-curl",
+        referenceTitle: String = "Biceps Curl"
+    ) {
+        self.initialReferenceVideoName = referenceVideoName
+        self.referenceTitle = referenceTitle
+    }
+
+    private var correctionPlanScore: Double {
+        formAccuracy > 0 ? Double(formAccuracy) / 100.0 : 0.70
+    }
+
     var body: some View {
-        ZStack(alignment: .top) {
-            Color.surface.ignoresSafeArea()
+        NavigationStack {
+            ZStack(alignment: .top) {
+                Color.surface.ignoresSafeArea()
 
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 28) {
-                    Color.clear.frame(height: 64)
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 28) {
+                        Color.clear.frame(height: 104)
 
-                    // ── Page Header ───────────────────────
-                    ComparePageHeader()
+                        // ── Page Header ───────────────────────
+                        ComparePageHeader(referenceTitle: referenceTitle)
+                            .padding(.horizontal, 24)
+
+                        // ── Dual Video Players ────────────────
+                        DualVideoSection(
+                            isPlaying: $isPlaying,
+                            expertProgress: $expertProgress,
+                            userProgress: $userProgress,
+                            userVideoSelection: $userVideoSelection,
+                            expertVideoURL: $expertVideoURL,
+                            userVideoURL: $userVideoURL,
+                            showUserPicker: $showUserPicker,
+                            initialReferenceVideoName: initialReferenceVideoName
+                        )
+
+                        // ── Sync Stats Row ────────────────────
+                        SyncStatsRow(
+                            formAccuracy: formAccuracy,
+                            syncOffset: syncOffset,
+                            angleDeviation: angleDeviation
+                        )
                         .padding(.horizontal, 24)
 
-                    // ── Dual Video Players ────────────────
-                    DualVideoSection(
-                        isPlaying: $isPlaying,
-                        expertProgress: $expertProgress,
-                        userProgress: $userProgress,
-                        expertVideoSelection: $expertVideoSelection,
-                        userVideoSelection: $userVideoSelection,
-                        expertVideoURL: $expertVideoURL,
-                        userVideoURL: $userVideoURL,
-                        showExpertPicker: $showExpertPicker,
-                        showUserPicker: $showUserPicker
-                    )
+                        // ── Issues Breakdown ──────────────────
+                        IssuesSection(issues: issues, isAnalyzing: isAnalyzing)
+                            .padding(.horizontal, 24)
 
-                    // ── Sync Stats Row ────────────────────
-                    SyncStatsRow(
-                        formAccuracy: formAccuracy,
-                        syncOffset: syncOffset,
-                        angleDeviation: angleDeviation
-                    )
-                    .padding(.horizontal, 24)
-
-                    // ── Issues Breakdown ──────────────────
-                    IssuesSection(issues: issues)
+                        // ── CTA ───────────────────────────────
+                        PrimaryButton(title: "Generate Correction Plan") {
+                            showCorrectionPlan = true
+                        }
                         .padding(.horizontal, 24)
 
-                    // ── CTA ───────────────────────────────
-                    PrimaryButton(title: "Generate Correction Plan") {
-                        // Navigate to corrections
+                        Color.clear.frame(height: 132)
                     }
-                    .padding(.horizontal, 24)
+                }
 
-                    Color.clear.frame(height: 32)
+                TopAppBar(trailingIcon: "gearshape") {
+                    showSettings = true
                 }
             }
-
-            TopAppBar(trailingIcon: "gearshape") {
-                showSettings = true
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(isPresented: $showCorrectionPlan) {
+                DrillPlanView(
+                    exerciseName: referenceTitle,
+                    formScore: correctionPlanScore,
+                    issueCount: max(issues.count, 1)
+                )
             }
+        }
+        .onChange(of: expertVideoURL) { _, _ in
+            runAccuracyAnalysisIfPossible()
+        }
+        .onChange(of: userVideoURL) { _, _ in
+            runAccuracyAnalysisIfPossible()
+        }
+        .onDisappear {
+            analysisTask?.cancel()
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
+        }
+    }
+
+    private func runAccuracyAnalysisIfPossible() {
+        guard let expertVideoURL, let userVideoURL else {
+            formAccuracy = 0
+            syncOffset = 0
+            angleDeviation = 0
+            issues = []
+            return
+        }
+
+        analysisTask?.cancel()
+        isAnalyzing = true
+
+        analysisTask = Task {
+            let result = await CompareAccuracyAnalyzer.analyze(
+                referenceURL: expertVideoURL,
+                userURL: userVideoURL
+            )
+
+            guard !Task.isCancelled else { return }
+
+            await MainActor.run {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.75)) {
+                    formAccuracy = result.accuracy
+                    syncOffset = result.syncOffsetMilliseconds
+                    angleDeviation = result.angleDeviation
+                    issues = result.issues
+                    isAnalyzing = false
+                }
+            }
         }
     }
 }
@@ -151,6 +217,8 @@ struct CompareView: View {
 // MARK: - Page Header
 
 private struct ComparePageHeader: View {
+    let referenceTitle: String
+
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Video Comparison")
@@ -158,7 +226,7 @@ private struct ComparePageHeader: View {
                 .tracking(-0.5)
                 .foregroundColor(.onSurface)
 
-            MetadataLabel(text: "Expert Reference vs Your Session", color: .outline)
+            MetadataLabel(text: "\(referenceTitle) reference vs your upload", color: .outline)
         }
     }
 }
@@ -169,94 +237,85 @@ private struct DualVideoSection: View {
     @Binding var isPlaying: Bool
     @Binding var expertProgress: Double
     @Binding var userProgress: Double
-    @Binding var expertVideoSelection: PhotosPickerItem?
     @Binding var userVideoSelection: PhotosPickerItem?
     @Binding var expertVideoURL: URL?
     @Binding var userVideoURL: URL?
-    @Binding var showExpertPicker: Bool
     @Binding var showUserPicker: Bool
+    let initialReferenceVideoName: String?
     
     @State private var expertPlayer: AVPlayer?
     @State private var userPlayer: AVPlayer?
     @State private var currentPlayerTimestamp: Double = 0
 
     var body: some View {
-        HStack(spacing: 8) {
-            // ── Expert Video (ซ้าย) ─────────────────────
-            VideoPanel(
-                label: "Expert Reference",
-                sublabel: "Olympic Level",
-                progress: $expertProgress,
-                badgeColor: .primary,
-                isExpert: true,
-                videoURL: $expertVideoURL,
-                videoSelection: $expertVideoSelection,
-                showPicker: $showExpertPicker,
-                player: $expertPlayer
-            )
-            .onTapGesture {
-                showExpertPicker = true
-            }
+        VStack(spacing: 18) {
+            HStack(spacing: 8) {
+                // ── Expert Video (ซ้าย) ─────────────────────
+                VideoPanel(
+                    label: "Expert Reference",
+                    sublabel: "Reference",
+                    progress: $expertProgress,
+                    badgeColor: .primary,
+                    isExpert: true,
+                    videoURL: $expertVideoURL,
+                    videoSelection: .constant(nil),
+                    showPicker: .constant(false),
+                    player: $expertPlayer,
+                    allowsUpload: false,
+                    emptyMessage: "Reference unavailable"
+                )
 
-            // ── User Video (ขวา) ────────────────────────
-            VideoPanel(
-                label: "User Recording",
-                sublabel: "Session #24",
-                progress: $userProgress,
-                badgeColor: .tertiary,
-                isExpert: false,
-                videoURL: $userVideoURL,
-                videoSelection: $userVideoSelection,
-                showPicker: $showUserPicker,
-                player: $userPlayer
-            )
-            .onTapGesture {
-                showUserPicker = true
-            }
-        }
-        .padding(.horizontal, 16)
-        .photosPicker(
-            isPresented: $showExpertPicker,
-            selection: $expertVideoSelection,
-            matching: .videos
-        )
-        .onChange(of: expertVideoSelection) { newValue in
-            Task {
-                if let data = try? await newValue?.loadTransferable(type: Data.self) {
-                    let tempURL = FileManager.default.temporaryDirectory
-                        .appendingPathComponent(UUID().uuidString)
-                        .appendingPathExtension("mov")
-                    try data.write(to: tempURL)
-                    expertVideoURL = tempURL
-                    expertPlayer = AVPlayer(url: tempURL)
+                // ── User Video (ขวา) ────────────────────────
+                VideoPanel(
+                    label: "User Recording",
+                    sublabel: "Your Session",
+                    progress: $userProgress,
+                    badgeColor: .tertiary,
+                    isExpert: false,
+                    videoURL: $userVideoURL,
+                    videoSelection: $userVideoSelection,
+                    showPicker: $showUserPicker,
+                    player: $userPlayer,
+                    allowsUpload: true,
+                    emptyMessage: "Tap to upload video"
+                )
+                .onTapGesture {
+                    showUserPicker = true
                 }
             }
+
+            SharedPlaybackControls(
+                isPlaying: $isPlaying,
+                expertPlayer: $expertPlayer,
+                userPlayer: $userPlayer
+            )
         }
+        .padding(.horizontal, 16)
         .photosPicker(
             isPresented: $showUserPicker,
             selection: $userVideoSelection,
             matching: .videos
         )
-        .onChange(of: userVideoSelection) { newValue in
+        .onChange(of: userVideoSelection) { _, newValue in
             Task {
-                if let data = try? await newValue?.loadTransferable(type: Data.self) {
-                    let tempURL = FileManager.default.temporaryDirectory
-                        .appendingPathComponent(UUID().uuidString)
-                        .appendingPathExtension("mov")
-                    try data.write(to: tempURL)
-                    userVideoURL = tempURL
-                    userPlayer = AVPlayer(url: tempURL)
+                if let videoFile = try? await newValue?.loadTransferable(type: VideoTransferable.self) {
+                    userVideoURL = videoFile.url
+                    userPlayer = AVPlayer(url: videoFile.url)
                 }
             }
         }
+        .onAppear {
+            loadBundledExpertReferenceIfNeeded()
+        }
+    }
 
-        // Shared Playback Controls
-        SharedPlaybackControls(
-            isPlaying: $isPlaying,
-            expertPlayer: $expertPlayer,
-            userPlayer: $userPlayer
-        )
-        .padding(.horizontal, 24)
+    private func loadBundledExpertReferenceIfNeeded() {
+        if expertVideoURL == nil,
+           let initialReferenceVideoName,
+           let url = ReferenceVideoLibrary.url(for: initialReferenceVideoName) {
+            expertVideoURL = url
+            expertPlayer = AVPlayer(url: url)
+        }
     }
 }
 
@@ -272,6 +331,8 @@ private struct VideoPanel: View {
     @Binding var videoSelection: PhotosPickerItem?
     @Binding var showPicker: Bool
     @Binding var player: AVPlayer?
+    let allowsUpload: Bool
+    let emptyMessage: String
 
     var body: some View {
         VStack(spacing: 0) {
@@ -292,7 +353,7 @@ private struct VideoPanel: View {
                                     .font(.system(size: 48, weight: .ultraLight))
                                     .foregroundColor(Color.outline.opacity(0.2))
                                 
-                                Text("Tap to upload video")
+                                Text(emptyMessage)
                                     .font(.system(size: 12, weight: .medium))
                                     .foregroundColor(Color.outline.opacity(0.4))
                             }
@@ -307,6 +368,8 @@ private struct VideoPanel: View {
                                 .font(.system(size: 9, weight: .black))
                                 .tracking(1.5)
                                 .foregroundColor(.onSurface)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
                                 .background(Color.containerHigh.opacity(0.7))
@@ -317,6 +380,8 @@ private struct VideoPanel: View {
                                 .font(.system(size: 9, weight: .medium))
                                 .tracking(1.2)
                                 .foregroundColor(badgeColor)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
                                 .padding(.horizontal, 8)
                         }
                         Spacer()
@@ -326,6 +391,12 @@ private struct VideoPanel: View {
                 }
             }
             .clipShape(RoundedRectangle(cornerRadius: 12))
+            .contentShape(RoundedRectangle(cornerRadius: 12))
+            .onTapGesture {
+                if allowsUpload {
+                    showPicker = true
+                }
+            }
         }
     }
 }
@@ -464,6 +535,7 @@ private struct SyncStatsRow: View {
 
 private struct IssuesSection: View {
     let issues: [CompareIssue]
+    let isAnalyzing: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -471,8 +543,26 @@ private struct IssuesSection: View {
                 .tracking(2)
 
             VStack(spacing: 12) {
-                ForEach(issues) { issue in
-                    IssueRow(issue: issue)
+                if isAnalyzing {
+                    Text("Calculating upper-body accuracy...")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.onSurfaceVariant)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .background(Color.containerLow)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                } else if issues.isEmpty {
+                    Text("Upload your video to calculate movement accuracy.")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(.onSurfaceVariant)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(16)
+                        .background(Color.containerLow)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                } else {
+                    ForEach(issues) { issue in
+                        IssueRow(issue: issue)
+                    }
                 }
             }
         }
@@ -517,17 +607,132 @@ private struct IssueRow: View {
 
 // MARK: - Video Player View
 
-struct VideoPlayerView: UIViewControllerRepresentable {
+struct VideoPlayerView: View {
     let url: URL
     let player: AVPlayer
-    
-    func makeUIViewController(context: Context) -> AVPlayerViewController {
-        let controller = AVPlayerViewController()
-        controller.player = player
-        return controller
+
+    @State private var thumbnail: UIImage?
+    @State private var isReadyToDisplay = false
+    @State private var failureMessage: String?
+
+    private let statusTimer = Timer.publish(every: 0.2, on: .main, in: .common).autoconnect()
+
+    var body: some View {
+        ZStack {
+            Color.black
+
+            PlayerLayerView(player: player)
+
+            if let thumbnail, !isReadyToDisplay {
+                Image(uiImage: thumbnail)
+                    .resizable()
+                    .scaledToFit()
+            }
+
+            if let failureMessage {
+                VStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 28, weight: .light))
+                    Text(failureMessage)
+                        .font(.system(size: 12, weight: .medium))
+                        .multilineTextAlignment(.center)
+                }
+                .foregroundColor(.white)
+                .padding(16)
+            }
+        }
+        .clipped()
+        .task(id: url) {
+            loadThumbnail()
+        }
+        .onAppear {
+            player.automaticallyWaitsToMinimizeStalling = false
+            refreshPlayerStatus()
+        }
+        .onReceive(statusTimer) { _ in
+            refreshPlayerStatus()
+        }
     }
-    
-    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
-        // Update if needed
+
+    private func refreshPlayerStatus() {
+        guard let item = player.currentItem else { return }
+
+        switch item.status {
+        case .readyToPlay:
+            isReadyToDisplay = true
+            failureMessage = nil
+        case .failed:
+            isReadyToDisplay = false
+            failureMessage = item.error?.localizedDescription ?? "Video could not be loaded."
+        case .unknown:
+            if player.timeControlStatus == .playing {
+                isReadyToDisplay = true
+            }
+            break
+        @unknown default:
+            break
+        }
+    }
+
+    private func loadThumbnail() {
+        let thumbnailURL = url
+
+        let asset = AVURLAsset(url: thumbnailURL)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: 900, height: 900)
+
+        generator.generateCGImageAsynchronously(
+            for: CMTime(seconds: 0.1, preferredTimescale: 600)
+        ) { cgImage, _, error in
+            if let cgImage {
+                let image = UIImage(cgImage: cgImage)
+                DispatchQueue.main.async {
+                    thumbnail = image
+                }
+            } else if error != nil {
+                DispatchQueue.main.async {
+                    if failureMessage == nil {
+                        failureMessage = "Video preview is loading."
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct PlayerLayerView: UIViewRepresentable {
+    let player: AVPlayer
+
+    func makeUIView(context: Context) -> PlayerLayerContainerView {
+        let view = PlayerLayerContainerView()
+        view.playerLayer.player = player
+        return view
+    }
+
+    func updateUIView(_ uiView: PlayerLayerContainerView, context: Context) {
+        uiView.playerLayer.player = player
+    }
+}
+
+private final class PlayerLayerContainerView: UIView {
+    override static var layerClass: AnyClass {
+        AVPlayerLayer.self
+    }
+
+    var playerLayer: AVPlayerLayer {
+        layer as! AVPlayerLayer
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .black
+        playerLayer.videoGravity = .resizeAspect
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        backgroundColor = .black
+        playerLayer.videoGravity = .resizeAspect
     }
 }

@@ -7,7 +7,6 @@
 
 import SwiftUI
 import CoreData
-import AVKit
 
 struct ExerciseDetailView: View {
 
@@ -18,7 +17,10 @@ struct ExerciseDetailView: View {
     @Environment(\.managedObjectContext)
     private var viewContext
 
+    @EnvironmentObject private var appNavigation: AppNavigationState
+
     @State private var isSaved: Bool = false
+    @State private var isShowingMissingVideoAlert = false
 
     // MARK: - Body
 
@@ -35,16 +37,11 @@ struct ExerciseDetailView: View {
 
                     // Top spacing
                     Color.clear
-                        .frame(height: 90)
-
-                    // MARK: - Hero Image
-
-                    HeroSection(exercise: exercise)
-                        .padding(.horizontal, 24)
+                        .frame(height: 104)
 
                     // MARK: - Main Content
 
-                    VStack(alignment: .leading, spacing: 28) {
+                    VStack(alignment: .leading, spacing: 24) {
 
                         // Exercise Title
                         titleSection
@@ -62,10 +59,10 @@ struct ExerciseDetailView: View {
                         actionButtons
                     }
                     .padding(.horizontal, 24)
-                    .padding(.top, 32)
+                    .padding(.top, 8)
 
                     Color.clear
-                        .frame(height: 40)
+                        .frame(height: 132)
                 }
             }
 
@@ -75,6 +72,11 @@ struct ExerciseDetailView: View {
             )
         }
         .navigationBarHidden(true)
+        .alert("Video not found", isPresented: $isShowingMissingVideoAlert) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("The reference video for this exercise is missing from the app bundle.")
+        }
     }
 }
 
@@ -89,9 +91,11 @@ extension ExerciseDetailView {
         VStack(alignment: .leading, spacing: 10) {
 
             Text(exercise.name ?? "Unknown Exercise")
-                .font(.system(size: 42, weight: .black))
-                .tracking(-1.5)
+                .font(.system(size: 40, weight: .black))
+                .tracking(-1)
                 .foregroundColor(.onSurface)
+                .lineLimit(2)
+                .minimumScaleFactor(0.82)
 
             HStack(spacing: 10) {
 
@@ -110,7 +114,13 @@ extension ExerciseDetailView {
 
     private var infoSection: some View {
 
-        HStack(spacing: 16) {
+        LazyVGrid(
+            columns: [
+                GridItem(.flexible(), spacing: 12),
+                GridItem(.flexible(), spacing: 12)
+            ],
+            spacing: 12
+        ) {
 
             DetailInfoCard(
                 title: "PRIMARY",
@@ -167,11 +177,7 @@ Upload your own movement video to compare against the reference motion and analy
 
         VStack(spacing: 14) {
 
-            Button {
-
-                print("Start Analysis")
-
-            } label: {
+            NavigationLink(destination: FormAnalysisView(initialExercise: analysisExerciseName)) {
 
                 HStack {
 
@@ -190,27 +196,36 @@ Upload your own movement video to compare against the reference motion and analy
             }
 
             Button {
-
-                print("Watch Reference")
-
-            } label: {
-
-                HStack {
-
-                    Image(systemName: "play.circle")
-
-                    Text("Watch Reference")
-                        .fontWeight(.semibold)
+                if referenceVideoURLForExercise() != nil {
+                    appNavigation.openCompare(
+                        referenceVideoName: exercise.imageName,
+                        referenceTitle: exercise.name ?? "Reference"
+                    )
+                } else {
+                    isShowingMissingVideoAlert = true
                 }
-                .foregroundColor(.onSurface)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
-                .background(Color.containerLow)
-                .clipShape(
-                    RoundedRectangle(cornerRadius: 18)
-                )
+            } label: {
+                watchReferenceLabel
             }
         }
+        .padding(.bottom, 12)
+    }
+
+    private var watchReferenceLabel: some View {
+        HStack {
+
+            Image(systemName: "play.circle")
+
+            Text("Watch Reference")
+                .fontWeight(.semibold)
+        }
+        .foregroundColor(.onSurface)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 18)
+        .background(Color.containerLow)
+        .clipShape(
+            RoundedRectangle(cornerRadius: 18)
+        )
     }
 }
 
@@ -219,6 +234,29 @@ Upload your own movement video to compare against the reference motion and analy
 // =====================================================
 
 extension ExerciseDetailView {
+
+    private var analysisExerciseName: String {
+        switch exercise.name ?? "" {
+        case "Forearm Curl", "Biceps Curl":
+            return "Arm Curls"
+        case "Shoulder Press":
+            return "Shoulder Press"
+        case "Lateral Raise":
+            return "Lateral Raises"
+        case "Front Raise":
+            return "Front Raises"
+        case "Triceps Extension", "Overhead Triceps Extension":
+            return "Arm Extensions"
+        case "Incline Row", "Inverted Row":
+            return "Upright Rows"
+        default:
+            return "Push-Ups"
+        }
+    }
+
+    private func referenceVideoURLForExercise() -> URL? {
+        ReferenceVideoLibrary.url(for: exercise.imageName)
+    }
 
     func toggleFavorite() {
 
@@ -239,76 +277,6 @@ extension ExerciseDetailView {
         Text(title)
             .font(.system(size: 22, weight: .bold))
             .foregroundColor(.onSurface)
-    }
-}
-
-// =====================================================
-// MARK: - Hero Section
-// =====================================================
-
-private struct HeroSection: View {
-
-    let exercise: CDExercise
-
-    var body: some View {
-
-        ZStack(alignment: .bottomLeading) {
-
-            Rectangle()
-                .fill(Color.containerHigh)
-                .aspectRatio(4/5, contentMode: .fit)
-                .clipShape(
-                    RoundedRectangle(cornerRadius: 28)
-                )
-                .overlay(
-
-                    Image(
-                        systemName:
-                            "figure.strengthtraining.traditional"
-                    )
-                    .font(
-                        .system(
-                            size: 80,
-                            weight: .ultraLight
-                        )
-                    )
-                    .foregroundColor(
-                        Color.outline.opacity(0.25)
-                    )
-                )
-
-            LinearGradient(
-                colors: [
-                    Color.surface,
-                    .clear
-                ],
-                startPoint: .bottom,
-                endPoint: UnitPoint(x: 0.5, y: 0.45)
-            )
-            .clipShape(
-                RoundedRectangle(cornerRadius: 28)
-            )
-
-            VStack(alignment: .leading, spacing: 6) {
-
-                MetadataLabel(
-                    text:
-                        (exercise.category ?? "")
-                        .uppercased(),
-                    color: .primary
-                )
-
-                Text(exercise.name ?? "")
-                    .font(
-                        .system(
-                            size: 34,
-                            weight: .black
-                        )
-                    )
-                    .foregroundColor(.onSurface)
-            }
-            .padding(24)
-        }
     }
 }
 
@@ -364,7 +332,7 @@ private struct TopBar: View {
             }
         }
         .padding(.horizontal, 24)
-        .padding(.top, 12)
+        .padding(.top, 58)
     }
 }
 
@@ -390,6 +358,8 @@ private struct DetailInfoCard: View {
             Text(value)
                 .font(.system(size: 14, weight: .bold))
                 .foregroundColor(.onSurface)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(16)
@@ -437,6 +407,8 @@ private struct InfoBadge: View {
             .font(.system(size: 11, weight: .black))
             .tracking(1.5)
             .foregroundColor(color)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
             .background(
@@ -458,10 +430,11 @@ private struct InfoBadge: View {
 
     let exercise = CDExercise(context: context)
 
-    exercise.name = "Bench Press"
-    exercise.category = "Chest"
+    exercise.name = "Biceps Curl"
+    exercise.category = "Arms"
     exercise.level = "Intermediate"
-    exercise.primaryMuscle = "Pectorals"
+    exercise.primaryMuscle = "Biceps"
+    exercise.imageName = "biceps-curl"
     exercise.isSaved = true
 
     return NavigationStack {
@@ -474,5 +447,6 @@ private struct InfoBadge: View {
         \.managedObjectContext,
          context
     )
+    .environmentObject(AppNavigationState())
     .preferredColorScheme(.dark)
 }

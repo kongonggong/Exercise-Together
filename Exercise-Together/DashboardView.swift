@@ -85,75 +85,49 @@ struct DashboardView: View {
     // MARK: - Body
 
     var body: some View {
-        ZStack(alignment: .top) {
-            Color.surface.ignoresSafeArea()
+        NavigationStack {
+            ZStack(alignment: .top) {
+                Color.surface.ignoresSafeArea()
 
-            ScrollView(showsIndicators: false) {
-                VStack(spacing: 32) {
-                    Color.clear.frame(height: 64)
+                ScrollView(showsIndicators: false) {
+                    VStack(spacing: 32) {
+                        Color.clear.frame(height: 104)
 
-                    // ── 1. Hero Banner ───────────────────
-                    HeroBannerSection(sessionCount: sessions.count)
+                        // ── 1. Hero Banner ───────────────────
+                        HeroBannerSection(sessionCount: sessions.count)
 
-                    // ── 2. Weekly Snapshot ───────────────
-                    WeeklySnapshotRow(
-                        calories: totalCaloriesBurned,
-                        reps: totalRepsThisWeek,
-                        sessions: sessions.count
-                    )
+                        // ── 2. Weekly Snapshot ───────────────
+                        WeeklySnapshotRow(
+                            calories: totalCaloriesBurned,
+                            reps: totalRepsThisWeek,
+                            sessions: sessions.count
+                        )
 
-                    // ── 3. Bento Grid ────────────────────
-                    BentoGridSection(
-                        score: performanceScore,
-                        weeklyChange: weeklyChange,
-                        metrics: metrics,
-                        formAccuracy: latestFormScore
-                    )
+                        // ── 3. Bento Grid ────────────────────
+                        BentoGridSection(
+                            score: performanceScore,
+                            weeklyChange: weeklyChange,
+                            metrics: metrics,
+                            formAccuracy: latestFormScore
+                        )
 
-                    // ── 4. Recent Sessions ───────────────
-                    RecentSessionsSection(sessions: Array(sessions.prefix(5)))
+                        // ── 4. Recent Sessions ───────────────
+                        RecentSessionsSection(sessions: Array(sessions.prefix(5)))
 
-                    Color.clear.frame(height: 32)
+                        Color.clear.frame(height: 132)
+                    }
+                    .padding(.horizontal, 24)
                 }
-                .padding(.horizontal, 24)
-            }
 
-            TopAppBar(trailingIcon: "gearshape") {
-                showSettings = true
+                TopAppBar(trailingIcon: "gearshape") {
+                    showSettings = true
+                }
             }
+            .toolbar(.hidden, for: .navigationBar)
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
         }
-        .onAppear { seedSessionsIfNeeded() }
-    }
-}
-
-// MARK: - Seeder (fallback sample data)
-
-extension DashboardView {
-
-    func seedSessionsIfNeeded() {
-        guard sessions.isEmpty else { return }
-
-        let sampleData: [(String, String, Int32, Int32)] = [
-            ("Heavy Leg Day",   "figure.strengthtraining.traditional", 72, 12450),
-            ("Upper Body Push", "figure.arms.open",                    58,  9800),
-            ("Olympic Pulls",   "figure.gymnastics",                   90, 15200),
-        ]
-
-        let calendar = Calendar.current
-        for (index, (name, icon, duration, volume)) in sampleData.enumerated() {
-            let session = CDWorkoutSession(context: viewContext)
-            session.id       = UUID()
-            session.name     = name
-            session.icon     = icon
-            session.duration = duration
-            session.volumeLbs = volume
-            session.date     = calendar.date(byAdding: .day, value: -index * 2, to: Date())
-        }
-
-        do { try viewContext.save() } catch { print(error.localizedDescription) }
     }
 }
 
@@ -176,22 +150,27 @@ private struct HeroBannerSection: View {
                 )
 
             VStack(alignment: .leading, spacing: 0) {
-                MetadataLabel(text: "Recommended Today", color: .primary)
+                MetadataLabel(
+                    text: sessionCount > 0 ? "Recommended Today" : "Start Your First Session",
+                    color: .primary
+                )
                     .padding(.bottom, 12)
 
-                Text("Ready to\nLift?")
+                Text(sessionCount > 0 ? "Ready to\nLift?" : "Ready to\nTrack?")
                     .font(PerformanceTextStyle.displayMedium)
                     .tracking(-1)
                     .foregroundColor(.onSurface)
                     .padding(.bottom, 16)
 
-                Text("Your physiological data suggests peak recovery.\nToday is optimized for a High-Intensity Session.")
+                Text(sessionCount > 0
+                     ? "Your recent form data is saved locally.\nStart another upper-body analysis session."
+                     : "Begin with an upper-body form check.\nYour result will appear on this dashboard.")
                     .font(PerformanceTextStyle.bodyMedium)
                     .foregroundColor(.onSurfaceVariant)
                     .lineSpacing(4)
                     .padding(.bottom, 28)
 
-                Button { } label: {
+                NavigationLink(destination: FormAnalysisView()) {
                     Text("START WORKOUT")
                         .font(PerformanceTextStyle.labelSmall)
                         .tracking(1.5)
@@ -283,7 +262,7 @@ private struct BentoGridSection: View {
     let formAccuracy: Double
 
     var body: some View {
-        HStack(alignment: .top, spacing: 16) {
+        VStack(spacing: 16) {
             PerformanceScoreCard(
                 score: score,
                 weeklyChange: weeklyChange,
@@ -380,7 +359,7 @@ private struct FormAnalysisSummaryCard: View {
 
             Text(accuracy > 0.8
                  ? "Great form! Keep up the momentum."
-                 : accuracy > 0 ? "Squat depth is inconsistent. Focus on hip mobility."
+                 : accuracy > 0 ? "Target joints need cleaner alignment. Review your upper-body cues."
                  : "No sessions yet. Start tracking to see your score.")
                 .font(PerformanceTextStyle.bodyMedium)
                 .foregroundColor(.onSurfaceVariant)
@@ -391,7 +370,7 @@ private struct FormAnalysisSummaryCard: View {
                 .background(Color.outlineVariant.opacity(0.2))
                 .padding(.bottom, 12)
 
-            Button { } label: {
+            NavigationLink(destination: DrillPlanView(formScore: max(accuracy, 0.70))) {
                 MetadataLabel(text: "View Detailed Drills", color: .primary)
                     .frame(maxWidth: .infinity)
             }
@@ -484,10 +463,10 @@ private struct CDSessionRow: View {
             Spacer()
 
             VStack(alignment: .trailing, spacing: 2) {
-                Text("\(session.volumeLbs.formatted())")
+                Text(session.volumeLbs > 0 ? "\(session.volumeLbs.formatted())" : "FORM")
                     .font(.system(size: 18, weight: .black))
                     .foregroundColor(.onSurface)
-                MetadataLabel(text: "LBS")
+                MetadataLabel(text: session.volumeLbs > 0 ? "LBS" : "CHECK")
             }
 
             Image(systemName: "chevron.right")

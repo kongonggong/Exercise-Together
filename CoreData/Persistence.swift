@@ -25,10 +25,11 @@ struct PersistenceController {
         let sample =
             CDExercise(context: context)
 
-        sample.name = "Bench Press"
-        sample.category = "Chest"
+        sample.name = "Biceps Curl"
+        sample.category = "Arms"
         sample.level = "Intermediate"
-        sample.primaryMuscle = "Pectorals"
+        sample.primaryMuscle = "Biceps"
+        sample.imageName = "biceps-curl"
         sample.isSaved = true
 
         do {

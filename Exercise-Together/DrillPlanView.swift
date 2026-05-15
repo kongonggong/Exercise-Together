@@ -45,65 +45,59 @@ private enum DrillPriority {
     }
 }
 
-// Sample drill plan data
-private let sampleDrills: [DrillItem] = [
-    DrillItem(
-        phase: "Activation",
-        name: "Glute Bridge Hold",
-        sets: 3, reps: "30 sec",
-        focus: "Posterior chain activation before compound loading",
-        icon: "figure.flexibility",
-        priority: .critical
-    ),
-    DrillItem(
-        phase: "Activation",
-        name: "Band Pull-Apart",
-        sets: 3, reps: "15",
-        focus: "Shoulder retraction and external rotation cue",
-        icon: "figure.arms.open",
-        priority: .moderate
-    ),
-    DrillItem(
-        phase: "Drill",
-        name: "Goblet Squat",
-        sets: 4, reps: "8",
-        focus: "Knee tracking and upright torso reinforcement",
-        icon: "figure.strengthtraining.traditional",
-        priority: .critical
-    ),
-    DrillItem(
-        phase: "Drill",
-        name: "Box Squat Pause",
-        sets: 4, reps: "5",
-        focus: "Hip crease depth consistency at controlled tempo",
-        icon: "figure.strengthtraining.functional",
-        priority: .moderate
-    ),
-    DrillItem(
-        phase: "Drill",
-        name: "Romanian Deadlift",
-        sets: 3, reps: "10",
-        focus: "Hip hinge mechanics and hamstring engagement",
-        icon: "figure.gymnastics",
-        priority: .moderate
-    ),
-    DrillItem(
-        phase: "Mobility",
-        name: "Couch Stretch",
-        sets: 2, reps: "90 sec",
-        focus: "Hip flexor lengthening — reduces anterior pelvic tilt",
-        icon: "figure.yoga",
-        priority: .maintenance
-    ),
-    DrillItem(
-        phase: "Mobility",
-        name: "Ankle Dorsiflexion",
-        sets: 2, reps: "60 sec",
-        focus: "Improve squat depth without heel elevation",
-        icon: "figure.walk",
-        priority: .maintenance
-    ),
-]
+private func drillPlan(for exerciseName: String) -> [DrillItem] {
+    switch exerciseName {
+    case "Arm Curls":
+        return [
+            DrillItem(phase: "Activation", name: "Scapular Set", sets: 2, reps: "10", focus: "Set the shoulder before curling so the elbow path stays quiet.", icon: "figure.arms.open", priority: .moderate),
+            DrillItem(phase: "Drill", name: "Wall Elbow Curl", sets: 3, reps: "8", focus: "Keep the upper arm close to the wall while the wrist travels toward the shoulder.", icon: "dumbbell", priority: .critical),
+            DrillItem(phase: "Drill", name: "Tempo Curl", sets: 3, reps: "6", focus: "Use a slow lower to keep the elbow angle controlled through the full range.", icon: "metronome", priority: .moderate),
+            DrillItem(phase: "Mobility", name: "Biceps Wall Stretch", sets: 2, reps: "30 sec", focus: "Open the front of the arm without losing shoulder position.", icon: "figure.cooldown", priority: .maintenance)
+        ]
+    case "Shoulder Press":
+        return [
+            DrillItem(phase: "Activation", name: "Wall Slide", sets: 3, reps: "8", focus: "Prime upward shoulder rotation while keeping ribs quiet.", icon: "arrow.up", priority: .critical),
+            DrillItem(phase: "Drill", name: "Seated Press Path", sets: 3, reps: "6", focus: "Press along a vertical line with elbow stacked under wrist.", icon: "figure.strengthtraining.traditional", priority: .critical),
+            DrillItem(phase: "Drill", name: "Overhead Lockout Hold", sets: 3, reps: "15 sec", focus: "Finish with a stable elbow and shoulder instead of drifting forward.", icon: "pause.circle", priority: .moderate),
+            DrillItem(phase: "Mobility", name: "Lat Reach Stretch", sets: 2, reps: "40 sec", focus: "Free overhead range so the press does not arch the torso.", icon: "figure.cooldown", priority: .maintenance)
+        ]
+    case "Lateral Raises":
+        return [
+            DrillItem(phase: "Activation", name: "Band Pull-Apart", sets: 3, reps: "12", focus: "Set shoulder blades before raising both arms.", icon: "figure.arms.open", priority: .moderate),
+            DrillItem(phase: "Drill", name: "Thumb-Up Lateral Raise", sets: 3, reps: "8", focus: "Raise both wrists evenly while keeping shoulders level.", icon: "arrow.left.and.right", priority: .critical),
+            DrillItem(phase: "Drill", name: "Top Range Pause", sets: 3, reps: "5 sec", focus: "Hold the top position without shrugging.", icon: "pause.circle", priority: .moderate),
+            DrillItem(phase: "Mobility", name: "Cross-Body Shoulder Stretch", sets: 2, reps: "30 sec", focus: "Reduce shoulder tightness before the next set.", icon: "figure.cooldown", priority: .maintenance)
+        ]
+    case "Front Raises":
+        return [
+            DrillItem(phase: "Activation", name: "Scapular Reach", sets: 2, reps: "10", focus: "Prepare the shoulder to move forward without shrugging.", icon: "figure.arms.open", priority: .moderate),
+            DrillItem(phase: "Drill", name: "Alternating Front Raise", sets: 3, reps: "8 each", focus: "Track one wrist at a time to shoulder height with a soft elbow.", icon: "arrow.up.forward", priority: .critical),
+            DrillItem(phase: "Drill", name: "Wall Front Raise", sets: 3, reps: "6", focus: "Keep the torso still while the arm angle changes.", icon: "rectangle.portrait", priority: .moderate),
+            DrillItem(phase: "Mobility", name: "Pec Doorway Stretch", sets: 2, reps: "30 sec", focus: "Open the chest so the shoulders start neutral.", icon: "figure.cooldown", priority: .maintenance)
+        ]
+    case "Arm Extensions":
+        return [
+            DrillItem(phase: "Activation", name: "Triceps Isometric Press", sets: 2, reps: "15 sec", focus: "Wake up elbow extension without shoulder movement.", icon: "hand.raised", priority: .moderate),
+            DrillItem(phase: "Drill", name: "Pinned-Elbow Extension", sets: 3, reps: "8", focus: "Keep the upper arm stable while the elbow opens and closes.", icon: "dumbbell", priority: .critical),
+            DrillItem(phase: "Drill", name: "End-Range Hold", sets: 3, reps: "5 sec", focus: "Pause at full extension so the lockout is visible.", icon: "pause.circle", priority: .moderate),
+            DrillItem(phase: "Mobility", name: "Overhead Triceps Stretch", sets: 2, reps: "30 sec", focus: "Restore comfortable elbow flexion for the next set.", icon: "figure.cooldown", priority: .maintenance)
+        ]
+    case "Upright Rows":
+        return [
+            DrillItem(phase: "Activation", name: "Scapular Shrug Reset", sets: 2, reps: "10", focus: "Find a controlled shoulder blade position before pulling.", icon: "figure.arms.open", priority: .moderate),
+            DrillItem(phase: "Drill", name: "Elbow-Led Row", sets: 3, reps: "8", focus: "Pull with elbows first and keep both sides level.", icon: "arrow.up", priority: .critical),
+            DrillItem(phase: "Drill", name: "Mirror Tempo Row", sets: 3, reps: "6", focus: "Move slowly enough to catch uneven elbow height.", icon: "metronome", priority: .moderate),
+            DrillItem(phase: "Mobility", name: "Upper Trap Release", sets: 2, reps: "30 sec", focus: "Reduce neck tension before the next row set.", icon: "figure.cooldown", priority: .maintenance)
+        ]
+    default:
+        return [
+            DrillItem(phase: "Activation", name: "Scapular Push-Up", sets: 3, reps: "10", focus: "Set the shoulder blades so the upper body tracks cleanly.", icon: "figure.arms.open", priority: .critical),
+            DrillItem(phase: "Drill", name: "Incline Push-Up", sets: 4, reps: "8", focus: "Keep shoulders, elbows, wrists, and waist visible while reducing load.", icon: "figure.strengthtraining.traditional", priority: .critical),
+            DrillItem(phase: "Drill", name: "Bottom Position Pause", sets: 3, reps: "5 sec", focus: "Pause with elbows bent and wrists under shoulders before pressing up.", icon: "pause.circle", priority: .moderate),
+            DrillItem(phase: "Mobility", name: "Pec Doorway Stretch", sets: 2, reps: "30 sec", focus: "Open the chest so shoulders stay aligned during reps.", icon: "figure.cooldown", priority: .maintenance)
+        ]
+    }
+}
 
 // =====================================================
 // MARK: - Main View
@@ -117,12 +111,17 @@ struct DrillPlanView: View {
     let exerciseName: String
     let formScore: Double
     let issueCount: Int
+    @State private var showSavedConfirmation = false
+
+    private var drills: [DrillItem] {
+        drillPlan(for: exerciseName)
+    }
 
     // Group drills by phase
     private var phases: [(String, [DrillItem])] {
         var result: [(String, [DrillItem])] = []
         var seen: [String: Int] = [:]
-        for drill in sampleDrills {
+        for drill in drills {
             if let idx = seen[drill.phase] {
                 result[idx].1.append(drill)
             } else {
@@ -135,7 +134,7 @@ struct DrillPlanView: View {
 
     // ปรับปรุง Initializer ให้รับ Double
     init(
-        exerciseName: String = "Barbell Squat",
+        exerciseName: String = "Push-Ups",
         formScore: Double = 0.70, // รับเป็น 0.0 - 1.0
         issueCount: Int = 2
     ) {
@@ -156,7 +155,7 @@ struct DrillPlanView: View {
 
                 VStack(alignment: .leading, spacing: 0) {
 
-                    Color.clear.frame(height: 64)
+                    Color.clear.frame(height: 104)
 
                     // ── Header ─────────────────────────
                     headerSection
@@ -179,16 +178,25 @@ struct DrillPlanView: View {
                     .padding(.top, 28)
 
                     // ── Save CTA ───────────────────────
-                    PrimaryButton(title: "Save to My Plan") {}
+                    PrimaryButton(title: "Save to My Plan") {
+                        showSavedConfirmation = true
+                    }
                         .padding(.horizontal, 24)
                         .padding(.top, 32)
 
-                    Color.clear.frame(height: 48)
+                    Color.clear.frame(height: 132)
                 }
             }
 
             // Top Bar
             drillTopBar
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        .navigationBarBackButtonHidden(true)
+        .alert("Plan saved", isPresented: $showSavedConfirmation) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Your drill plan is ready for the next training session.")
         }
     }
 }
@@ -237,7 +245,8 @@ extension DrillPlanView {
             Color.clear.frame(width: 40, height: 40)
         }
         .padding(.horizontal, 24)
-        .frame(height: 64)
+        .padding(.top, 48)
+        .frame(height: 104, alignment: .top)
         .background(
             Color.surface.opacity(0.8)
                 .background(.ultraThinMaterial)
@@ -261,7 +270,7 @@ extension DrillPlanView {
                 .lineSpacing(2)
 
             MetadataLabel(
-                text: "\(sampleDrills.count) drills · \(issueCount) issues targeted",
+                text: "\(drills.count) drills · \(issueCount) issues targeted",
                 color: .outline
             )
             .tracking(2)
@@ -299,7 +308,7 @@ extension DrillPlanView {
 
             OverviewStat(
                 label: "Drills",
-                value: "\(sampleDrills.count)",
+                value: "\(drills.count)",
                 icon: "list.bullet.clipboard.fill",
                 color: .primary
             )
@@ -501,7 +510,7 @@ private struct DrillCard: View {
 
 #Preview {
     DrillPlanView(
-        exerciseName: "Barbell Squat",
+        exerciseName: "Push-Ups",
         formScore: 0.70,
         issueCount: 2
     )

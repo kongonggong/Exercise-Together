@@ -32,15 +32,30 @@ enum AppTab: Int, CaseIterable {
     }
 }
 
+final class AppNavigationState: ObservableObject {
+    @Published var selectedTab: AppTab = .dashboard
+    @Published var compareReferenceVideoName: String? = "biceps-curl"
+    @Published var compareReferenceTitle: String = "Biceps Curl"
+
+    func openCompare(referenceVideoName: String?, referenceTitle: String) {
+        compareReferenceVideoName = referenceVideoName
+        compareReferenceTitle = referenceTitle
+
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            selectedTab = .compare
+        }
+    }
+}
+
 // MARK: - Root Content View
 
 struct ContentView: View {
-    @State private var selectedTab: AppTab = .dashboard
+    @StateObject private var appNavigation = AppNavigationState()
 
     var body: some View {
         ZStack(alignment: .bottom) {
             // ── Page Content ──────────────────────────────
-            TabView(selection: $selectedTab) {
+            TabView(selection: $appNavigation.selectedTab) {
                 DashboardView()
                     .tag(AppTab.dashboard)
 
@@ -50,16 +65,21 @@ struct ContentView: View {
                 FormAnalysisView()
                     .tag(AppTab.formAnalysis)
 
-                CompareView()
+                CompareView(
+                    referenceVideoName: appNavigation.compareReferenceVideoName,
+                    referenceTitle: appNavigation.compareReferenceTitle
+                )
+                    .id("\(appNavigation.compareReferenceVideoName ?? "none")-\(appNavigation.compareReferenceTitle)")
                     .tag(AppTab.compare)
             }
             .tabViewStyle(.page(indexDisplayMode: .never)) // Custom tab bar แทน native
             .ignoresSafeArea()
 
             // ── Custom Tab Bar (Glassmorphic) ─────────────
-            CustomTabBar(selectedTab: $selectedTab)
+            CustomTabBar(selectedTab: $appNavigation.selectedTab)
         }
         .preferredColorScheme(.dark)
+        .environmentObject(appNavigation)
     }
 }
 

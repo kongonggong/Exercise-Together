@@ -7,7 +7,9 @@ import SwiftUI
 final class CameraViewController: UIViewController {
     private var cameraSession: AVCaptureSession?
     var delegate: AVCaptureVideoDataOutputSampleBufferDelegate?
+    var recordingManager: CameraRecordingManager?
     private let cameraQueue = DispatchQueue(label: "CameraOutput", qos: .userInteractive)
+    private let movieOutput = AVCaptureMovieFileOutput()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -26,6 +28,7 @@ final class CameraViewController: UIViewController {
 
     override func viewWillDisappear(_ animated: Bool) {
         // หยุด session เมื่อปิดหน้าจอ
+        recordingManager?.stopRecording()
         if let session = cameraSession, session.isRunning {
             session.stopRunning()
         }
@@ -68,6 +71,9 @@ final class CameraViewController: UIViewController {
             // เริ่มการทำงานใน Background Thread เพื่อไม่ให้ UI ค้าง
             DispatchQueue.global(qos: .userInitiated).async { [weak self] in
                 self?.cameraSession?.startRunning()
+                DispatchQueue.main.async {
+                    self?.recordingManager?.startRecordingIfPending()
+                }
             }
         } catch {
             print("Setup Error: \(error.localizedDescription)")
@@ -81,20 +87,25 @@ final class CameraViewController: UIViewController {
     private func adjustPreviewLayerOrientation() {
         DispatchQueue.main.async { [weak self] in
             guard let self = self, let connection = self.cameraView.previewLayer.connection else { return }
-            let orientation = UIDevice.current.orientation
-            guard connection.isVideoOrientationSupported else { return }
-            connection.videoOrientation = self.videoOrientation(from: orientation)
+            let angle = self.videoRotationAngle()
+            guard connection.isVideoRotationAngleSupported(angle) else { return }
+            connection.videoRotationAngle = angle
+            if let recordingConnection = self.movieOutput.connection(with: .video),
+               recordingConnection.isVideoRotationAngleSupported(angle) {
+                recordingConnection.videoRotationAngle = angle
+            }
             self.cameraView.previewLayer.frame = self.view.bounds
         }
     }
 
-    private func videoOrientation(from deviceOrientation: UIDeviceOrientation) -> AVCaptureVideoOrientation {
-        switch deviceOrientation {
-        case .portrait: return .portrait
-        case .landscapeRight: return .landscapeLeft
-        case .portraitUpsideDown: return .portraitUpsideDown
-        case .landscapeLeft: return .landscapeRight
-        default: return .portrait
+    private func videoRotationAngle() -> CGFloat {
+        let interfaceOrientation = view.window?.windowScene?.interfaceOrientation ?? .portrait
+        switch interfaceOrientation {
+        case .portrait: return 90
+        case .landscapeRight: return 180
+        case .portraitUpsideDown: return 270
+        case .landscapeLeft: return 0
+        default: return 90
         }
     }
 
@@ -117,6 +128,11 @@ final class CameraViewController: UIViewController {
         if session.canAddOutput(dataOutput) {
             session.addOutput(dataOutput)
             dataOutput.setSampleBufferDelegate(delegate, queue: cameraQueue)
+        }
+
+        if session.canAddOutput(movieOutput) {
+            session.addOutput(movieOutput)
+            recordingManager?.attach(movieOutput: movieOutput)
         }
         
         session.commitConfiguration()

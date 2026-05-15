@@ -55,10 +55,10 @@ struct AddExerciseView: View {
                     // ── Name ────────────────
                     formField(
                         label: "Movement Name",
-                        placeholder: "e.g. Romanian Deadlift"
+                        placeholder: "e.g. Biceps Curl"
                     ) {
                         FormTextField(
-                            placeholder: "e.g. Romanian Deadlift",
+                            placeholder: "e.g. Biceps Curl",
                             text: $name
                         )
                     }
@@ -71,10 +71,10 @@ struct AddExerciseView: View {
                     // ── Primary Muscle ───────
                     formField(
                         label: "Primary Muscle",
-                        placeholder: "e.g. Hamstrings"
+                        placeholder: "e.g. Biceps"
                     ) {
                         FormTextField(
-                            placeholder: "e.g. Hamstrings",
+                            placeholder: "e.g. Biceps",
                             text: $primaryMuscle
                         )
                     }

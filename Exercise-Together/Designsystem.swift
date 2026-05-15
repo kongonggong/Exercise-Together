@@ -89,6 +89,9 @@ struct MetadataLabel: View {
             .font(PerformanceTextStyle.labelSmall)
             .tracking(1.2)
             .foregroundColor(color)
+            .lineLimit(2)
+            .minimumScaleFactor(0.75)
+            .allowsTightening(true)
     }
 }
 
@@ -201,6 +204,8 @@ struct TopAppBar: View {
                     .font(.system(size: 15, weight: .black))
                     .tracking(1)
                     .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
 
             Spacer()
@@ -215,7 +220,8 @@ struct TopAppBar: View {
             }
         }
         .padding(.horizontal, 24)
-        .frame(height: 64)
+        .padding(.top, 48)
+        .frame(height: 104, alignment: .top)
         .background(
             Color.surface.opacity(0.8)
                 .background(.ultraThinMaterial)

@@ -84,7 +84,7 @@ struct WorkoutHistoryView: View {
 
                 VStack(alignment: .leading, spacing: 0) {
 
-                    Color.clear.frame(height: 64)
+                    Color.clear.frame(height: 104)
 
                     // ── Header ─────────────────────────
                     headerSection
@@ -110,7 +110,7 @@ struct WorkoutHistoryView: View {
                             .padding(.top, 24)
                     }
 
-                    Color.clear.frame(height: 40)
+                    Color.clear.frame(height: 132)
                 }
             }
 
@@ -163,7 +163,8 @@ extension WorkoutHistoryView {
             Color.clear.frame(width: 40, height: 40)
         }
         .padding(.horizontal, 24)
-        .frame(height: 64)
+        .padding(.top, 48)
+        .frame(height: 104, alignment: .top)
         .background(
             Color.surface.opacity(0.8)
                 .background(.ultraThinMaterial)
