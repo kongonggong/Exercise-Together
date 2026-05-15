@@ -87,6 +87,9 @@ struct CompareView: View {
     @State private var userVideoURL: URL?
     @State private var showExpertPicker: Bool = false
     @State private var showUserPicker: Bool = false
+    
+    // Settings
+    @State private var showSettings: Bool = false
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -135,7 +138,12 @@ struct CompareView: View {
                 }
             }
 
-            TopAppBar(trailingIcon: "gearshape")
+            TopAppBar(trailingIcon: "gearshape") {
+                showSettings = true
+            }
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
         }
     }
 }

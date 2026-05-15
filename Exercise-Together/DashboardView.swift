@@ -24,6 +24,9 @@ struct DashboardView: View {
         animation: .default
     )
     private var analysisResults: FetchedResults<CDFormAnalysisResult>
+    
+    // Settings
+    @State private var showSettings: Bool = false
 
     // MARK: - Computed Stats
 
@@ -115,7 +118,12 @@ struct DashboardView: View {
                 .padding(.horizontal, 24)
             }
 
-            TopAppBar()
+            TopAppBar(trailingIcon: "gearshape") {
+                showSettings = true
+            }
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
         }
         .onAppear { seedSessionsIfNeeded() }
     }

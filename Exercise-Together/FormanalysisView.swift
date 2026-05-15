@@ -53,6 +53,9 @@ struct FormAnalysisView: View {
     // Summary sheet
     @State private var showSummary:    Bool = false
     @State private var savedResultID:  UUID?
+    
+    // Settings
+    @State private var showSettings: Bool = false
 
     // MARK: - Body
 
@@ -137,7 +140,12 @@ struct FormAnalysisView: View {
                 .presentationDetents([.medium])
             }
 
-            TopAppBar()
+            TopAppBar(trailingIcon: "gearshape") {
+                showSettings = true
+            }
+        }
+        .sheet(isPresented: $showSettings) {
+            SettingsView()
         }
     }
 
