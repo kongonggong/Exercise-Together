@@ -177,7 +177,9 @@ Upload your own movement video to compare against the reference motion and analy
 
         VStack(spacing: 14) {
 
-            NavigationLink(destination: FormAnalysisView(initialExercise: analysisExerciseName)) {
+            Button {
+                appNavigation.openFormAnalysis(initialExercise: analysisExerciseName)
+            } label: {
 
                 HStack {
 

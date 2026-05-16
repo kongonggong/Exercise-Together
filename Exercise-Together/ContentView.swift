@@ -34,8 +34,17 @@ enum AppTab: Int, CaseIterable {
 
 final class AppNavigationState: ObservableObject {
     @Published var selectedTab: AppTab = .dashboard
+    @Published var formAnalysisExercise: String = "Push-Ups"
     @Published var compareReferenceVideoName: String? = "biceps-curl"
     @Published var compareReferenceTitle: String = "Biceps Curl"
+
+    func openFormAnalysis(initialExercise: String) {
+        formAnalysisExercise = initialExercise
+
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+            selectedTab = .formAnalysis
+        }
+    }
 
     func openCompare(referenceVideoName: String?, referenceTitle: String) {
         compareReferenceVideoName = referenceVideoName
@@ -62,7 +71,8 @@ struct ContentView: View {
                 LibraryView()
                     .tag(AppTab.library)
 
-                FormAnalysisView()
+                FormAnalysisView(initialExercise: appNavigation.formAnalysisExercise)
+                    .id(appNavigation.formAnalysisExercise)
                     .tag(AppTab.formAnalysis)
 
                 CompareView(
