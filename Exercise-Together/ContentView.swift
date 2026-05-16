@@ -72,7 +72,6 @@ struct ContentView: View {
                     .tag(AppTab.library)
 
                 FormAnalysisView(initialExercise: appNavigation.formAnalysisExercise)
-                    .id(appNavigation.formAnalysisExercise)
                     .tag(AppTab.formAnalysis)
 
                 CompareView(

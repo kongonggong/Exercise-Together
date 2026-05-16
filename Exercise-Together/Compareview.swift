@@ -6,6 +6,7 @@
 import SwiftUI
 import PhotosUI
 import AVKit
+import Vision
 
 class PlayerState: NSObject, ObservableObject {
     @Published var player: AVPlayer?
@@ -67,6 +68,93 @@ class PlayerState: NSObject, ObservableObject {
         if let timeObserverToken = timeObserverToken {
             player?.removeTimeObserver(timeObserverToken)
         }
+    }
+}
+
+private final class VideoPoseOverlayModel: NSObject, ObservableObject {
+    @Published var bodyParts = [VNHumanBodyPoseObservation.JointName: VNRecognizedPoint]()
+
+    private weak var player: AVPlayer?
+    private weak var playerItem: AVPlayerItem?
+    private var videoOutput: AVPlayerItemVideoOutput?
+    private var displayLink: CADisplayLink?
+    private var isProcessingFrame = false
+
+    func attach(to player: AVPlayer?) {
+        stop(clearPose: true)
+
+        guard let player, let item = player.currentItem else { return }
+        self.player = player
+        self.playerItem = item
+
+        let pixelBufferAttributes = [
+            kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)
+        ]
+        let output = AVPlayerItemVideoOutput(pixelBufferAttributes: pixelBufferAttributes)
+        item.add(output)
+        videoOutput = output
+
+        let link = CADisplayLink(target: self, selector: #selector(displayLinkFired))
+        link.preferredFramesPerSecond = 8
+        link.add(to: .main, forMode: .common)
+        displayLink = link
+    }
+
+    func stop(clearPose: Bool = false) {
+        displayLink?.invalidate()
+        displayLink = nil
+
+        if let videoOutput, let playerItem {
+            playerItem.remove(videoOutput)
+        }
+
+        videoOutput = nil
+        playerItem = nil
+        player = nil
+        isProcessingFrame = false
+
+        if clearPose {
+            bodyParts = [:]
+        }
+    }
+
+    @objc private func displayLinkFired() {
+        guard !isProcessingFrame,
+              let player,
+              let output = videoOutput else {
+            return
+        }
+
+        let itemTime = player.currentTime()
+        guard output.hasNewPixelBuffer(forItemTime: itemTime) else { return }
+
+        var presentationTime = CMTime.zero
+        guard let pixelBuffer = output.copyPixelBuffer(forItemTime: itemTime, itemTimeForDisplay: &presentationTime) else {
+            return
+        }
+
+        isProcessingFrame = true
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            let request = VNDetectHumanBodyPoseRequest()
+            let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up)
+            let points: [VNHumanBodyPoseObservation.JointName: VNRecognizedPoint]?
+
+            do {
+                try handler.perform([request])
+                points = try request.results?.first?.recognizedPoints(.all)
+            } catch {
+                points = nil
+            }
+
+            DispatchQueue.main.async {
+                self?.bodyParts = points ?? [:]
+                self?.isProcessingFrame = false
+            }
+        }
+    }
+
+    deinit {
+        stop()
     }
 }
 
@@ -299,8 +387,12 @@ private struct DualVideoSection: View {
         .onChange(of: userVideoSelection) { _, newValue in
             Task {
                 if let videoFile = try? await newValue?.loadTransferable(type: VideoTransferable.self) {
-                    userVideoURL = videoFile.url
-                    userPlayer = AVPlayer(url: videoFile.url)
+                    let uploadedPlayer = AVPlayer(url: videoFile.url)
+                    await MainActor.run {
+                        userVideoURL = videoFile.url
+                        userPlayer = uploadedPlayer
+                        resetPlayersForSynchronizedPlayback()
+                    }
                 }
             }
         }
@@ -315,7 +407,16 @@ private struct DualVideoSection: View {
            let url = ReferenceVideoLibrary.url(for: initialReferenceVideoName) {
             expertVideoURL = url
             expertPlayer = AVPlayer(url: url)
+            resetPlayersForSynchronizedPlayback()
         }
+    }
+
+    private func resetPlayersForSynchronizedPlayback() {
+        isPlaying = false
+        expertPlayer?.pause()
+        userPlayer?.pause()
+        expertPlayer?.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
+        userPlayer?.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
     }
 }
 
@@ -333,6 +434,7 @@ private struct VideoPanel: View {
     @Binding var player: AVPlayer?
     let allowsUpload: Bool
     let emptyMessage: String
+    @StateObject private var poseOverlay = VideoPoseOverlayModel()
 
     var body: some View {
         VStack(spacing: 0) {
@@ -342,6 +444,13 @@ private struct VideoPanel: View {
                 if let url = videoURL, let player = player {
                     VideoPlayerView(url: url, player: player)
                         .aspectRatio(9/16, contentMode: .fit)
+
+                    UpperBodySkeletonOverlay(
+                        bodyParts: poseOverlay.bodyParts,
+                        isMirrored: !isExpert,
+                        lineColor: isExpert ? .primary : .tertiary,
+                        jointColor: isExpert ? .primary : .tertiary
+                    )
                 } else {
                     Rectangle()
                         .fill(Color.containerLowest)
@@ -397,6 +506,17 @@ private struct VideoPanel: View {
                     showPicker = true
                 }
             }
+            .onAppear {
+                poseOverlay.attach(to: player)
+            }
+            .onChange(of: videoURL) { _, _ in
+                DispatchQueue.main.async {
+                    poseOverlay.attach(to: player)
+                }
+            }
+            .onDisappear {
+                poseOverlay.stop(clearPose: true)
+            }
         }
     }
 }
@@ -427,6 +547,8 @@ private struct SharedPlaybackControls: View {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
                     isPlaying.toggle()
                     if isPlaying {
+                        seekToStartIfFinished(expertPlayer)
+                        seekToStartIfFinished(userPlayer)
                         expertPlayer?.play()
                         userPlayer?.play()
                     } else {
@@ -467,6 +589,17 @@ private struct SharedPlaybackControls: View {
 
             Spacer()
         }
+    }
+
+    private func seekToStartIfFinished(_ player: AVPlayer?) {
+        guard let player,
+              let duration = player.currentItem?.duration.seconds,
+              duration.isFinite,
+              player.currentTime().seconds >= duration - 0.05 else {
+            return
+        }
+
+        player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
     }
 }
 

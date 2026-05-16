@@ -8,6 +8,7 @@ import SwiftUI
 import PhotosUI
 import AVKit
 import CoreData
+import Vision
 
 private let supportedExercises = [
     "Push-Ups",
@@ -43,6 +44,19 @@ private enum FocusJoint: CaseIterable, Hashable {
         case .rightWrist: return CGPoint(x: 0.60, y: 0.78)
         }
     }
+
+    var visionJoint: VNHumanBodyPoseObservation.JointName? {
+        switch self {
+        case .nose: return .nose
+        case .torso: return nil
+        case .leftShoulder: return .leftShoulder
+        case .rightShoulder: return .rightShoulder
+        case .leftElbow: return .leftElbow
+        case .rightElbow: return .rightElbow
+        case .leftWrist: return .leftWrist
+        case .rightWrist: return .rightWrist
+        }
+    }
 }
 
 private struct ExerciseFocusProfile {
@@ -52,6 +66,10 @@ private struct ExerciseFocusProfile {
     let trackingCue: String
     let checklist: [ChecklistItem]
     let highlightedJoints: Set<FocusJoint>
+
+    var highlightedVisionJoints: Set<VNHumanBodyPoseObservation.JointName> {
+        Set(highlightedJoints.compactMap(\.visionJoint))
+    }
 
     static func profile(for exercise: String) -> ExerciseFocusProfile {
         switch exercise {
@@ -228,6 +246,8 @@ private struct LibraryExerciseProfile {
 
 struct FormAnalysisView: View {
 
+    private let initialExercise: String
+
     // MARK: - Core Data
 
     @Environment(\.managedObjectContext) private var viewContext
@@ -256,6 +276,7 @@ struct FormAnalysisView: View {
     init(initialExercise: String = defaultSupportedExercise) {
         let normalizedExercise = supportedExercises.contains(initialExercise)
             ? initialExercise : defaultSupportedExercise
+        self.initialExercise = normalizedExercise
         _selectedExercise = State(initialValue: normalizedExercise)
     }
 
@@ -351,7 +372,8 @@ struct FormAnalysisView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
-            .onAppear { applySelectedExercise() }
+            .onAppear { syncInitialExercise() }
+            .onChange(of: initialExercise) { _, _ in syncInitialExercise() }
             .onChange(of: selectedExercise) { _, _ in applySelectedExercise() }
             .onChange(of: selectedVideoItem) { _, newItem in
                 Task {
@@ -394,6 +416,15 @@ struct FormAnalysisView: View {
         let normalized = supportedExercises.contains(selectedExercise)
             ? selectedExercise : defaultSupportedExercise
         if selectedExercise != normalized { selectedExercise = normalized }
+        poseEstimator.updateCurrentExercise(to: normalized)
+    }
+
+    private func syncInitialExercise() {
+        let normalized = supportedExercises.contains(initialExercise)
+            ? initialExercise : defaultSupportedExercise
+        if selectedExercise != normalized {
+            selectedExercise = normalized
+        }
         poseEstimator.updateCurrentExercise(to: normalized)
     }
 
@@ -617,6 +648,18 @@ private struct CameraViewport: View {
                     }
                 )
 
+            if shouldShowDetectedSkeleton {
+                UpperBodySkeletonOverlay(
+                    bodyParts: poseEstimator.bodyParts,
+                    highlightedJoints: focusProfile.highlightedVisionJoints,
+                    isMirrored: selectedVideoURL == nil,
+                    lineColor: skeletonColor,
+                    jointColor: skeletonColor
+                )
+                .frame(height: 320)
+                .padding(6)
+            }
+
             VStack {
                 HStack {
                     Spacer()
@@ -704,6 +747,15 @@ private struct CameraViewport: View {
             return "SHOW TARGET JOINTS"
         }
         return poseEstimator.isGoodForm ? "PERFECT FORM" : "ADJUST POSTURE"
+    }
+
+    private var shouldShowDetectedSkeleton: Bool {
+        (isTracking || selectedVideoURL != nil) && !poseEstimator.bodyParts.isEmpty
+    }
+
+    private var skeletonColor: Color {
+        guard poseEstimator.isProperlyFramed, poseEstimator.isFrameValid else { return .red }
+        return poseEstimator.isGoodForm ? .primary : .tertiary
     }
 }
 

@@ -21,10 +21,10 @@ enum CompareAccuracyAnalyzer {
         await Task.detached(priority: .userInitiated) {
             let referenceSamples = await sampleVideo(url: referenceURL)
             let userSamples = await sampleVideo(url: userURL)
-            let comparablePairs = zip(referenceSamples, userSamples).compactMap { reference, user -> PoseComparison? in
-                guard let reference, let user else { return nil }
-                return PoseComparison(reference: reference, user: user)
-            }
+            let comparablePairs = alignedComparablePairs(
+                referenceSamples: referenceSamples,
+                userSamples: userSamples
+            )
 
             guard comparablePairs.count >= minimumComparableFrames else {
                 return CompareAnalysisResult(
@@ -61,6 +61,24 @@ enum CompareAccuracyAnalyzer {
                 issues: issues
             )
         }.value
+    }
+
+    private static func alignedComparablePairs(
+        referenceSamples: [PoseSample?],
+        userSamples: [PoseSample?]
+    ) -> [PoseComparison] {
+        userSamples.enumerated().compactMap { index, userSample -> PoseComparison? in
+            guard let userSample else { return nil }
+
+            let nearbyReferenceSamples = [index - 1, index, index + 1].compactMap { referenceIndex -> PoseSample? in
+                guard referenceSamples.indices.contains(referenceIndex) else { return nil }
+                return referenceSamples[referenceIndex]
+            }
+
+            return nearbyReferenceSamples
+                .compactMap { PoseComparison(reference: $0, user: userSample) }
+                .min(by: { $0.deviation < $1.deviation })
+        }
     }
 
     private static func sampleVideo(url: URL) async -> [PoseSample?] {
@@ -284,31 +302,69 @@ enum CompareAccuracyAnalyzer {
         let wristHeightDeviation: Double
 
         init?(reference: PoseSample, user: PoseSample) {
+            let candidates = [
+                PoseComparison.metrics(reference: reference, user: user, mirroredUser: false),
+                PoseComparison.metrics(reference: reference, user: user, mirroredUser: true)
+            ].compactMap { $0 }
+
+            guard let bestMatch = candidates.min(by: { $0.deviation < $1.deviation }) else {
+                return nil
+            }
+
+            deviation = bestMatch.deviation
+            elbowDeviation = bestMatch.elbowDeviation
+            wristHeightDeviation = bestMatch.wristHeightDeviation
+        }
+
+        private static func metrics(
+            reference: PoseSample,
+            user: PoseSample,
+            mirroredUser: Bool
+        ) -> ComparisonMetrics? {
             var weightedDifferences: [(difference: Double, weight: Double)] = []
 
-            PoseComparison.appendAngleDifference(reference.leftElbowAngle, user.leftElbowAngle, weight: 1.2, to: &weightedDifferences)
-            PoseComparison.appendAngleDifference(reference.rightElbowAngle, user.rightElbowAngle, weight: 1.2, to: &weightedDifferences)
-            PoseComparison.appendHeightDifference(reference.leftWristHeight, user.leftWristHeight, weight: 1.0, to: &weightedDifferences)
-            PoseComparison.appendHeightDifference(reference.rightWristHeight, user.rightWristHeight, weight: 1.0, to: &weightedDifferences)
-            PoseComparison.appendHeightDifference(reference.leftElbowHeight, user.leftElbowHeight, weight: 0.8, to: &weightedDifferences)
-            PoseComparison.appendHeightDifference(reference.rightElbowHeight, user.rightElbowHeight, weight: 0.8, to: &weightedDifferences)
+            let userLeftElbowAngle = mirroredUser ? user.rightElbowAngle : user.leftElbowAngle
+            let userRightElbowAngle = mirroredUser ? user.leftElbowAngle : user.rightElbowAngle
+            let userLeftWristHeight = mirroredUser ? user.rightWristHeight : user.leftWristHeight
+            let userRightWristHeight = mirroredUser ? user.leftWristHeight : user.rightWristHeight
+            let userLeftElbowHeight = mirroredUser ? user.rightElbowHeight : user.leftElbowHeight
+            let userRightElbowHeight = mirroredUser ? user.leftElbowHeight : user.rightElbowHeight
+
+            PoseComparison.appendAngleDifference(reference.leftElbowAngle, userLeftElbowAngle, weight: 1.2, to: &weightedDifferences)
+            PoseComparison.appendAngleDifference(reference.rightElbowAngle, userRightElbowAngle, weight: 1.2, to: &weightedDifferences)
+            PoseComparison.appendHeightDifference(reference.leftWristHeight, userLeftWristHeight, weight: 1.0, to: &weightedDifferences)
+            PoseComparison.appendHeightDifference(reference.rightWristHeight, userRightWristHeight, weight: 1.0, to: &weightedDifferences)
+            PoseComparison.appendHeightDifference(reference.leftElbowHeight, userLeftElbowHeight, weight: 0.8, to: &weightedDifferences)
+            PoseComparison.appendHeightDifference(reference.rightElbowHeight, userRightElbowHeight, weight: 0.8, to: &weightedDifferences)
 
             guard !weightedDifferences.isEmpty else { return nil }
 
             let totalWeight = weightedDifferences.map(\.weight).reduce(0, +)
-            deviation = weightedDifferences.map { $0.difference * $0.weight }.reduce(0, +) / totalWeight
+            let deviation = weightedDifferences.map { $0.difference * $0.weight }.reduce(0, +) / totalWeight
 
             let elbowValues = [
-                PoseComparison.angleDifference(reference.leftElbowAngle, user.leftElbowAngle),
-                PoseComparison.angleDifference(reference.rightElbowAngle, user.rightElbowAngle)
+                PoseComparison.angleDifference(reference.leftElbowAngle, userLeftElbowAngle),
+                PoseComparison.angleDifference(reference.rightElbowAngle, userRightElbowAngle)
             ].compactMap { $0 }
-            elbowDeviation = elbowValues.isEmpty ? 0 : elbowValues.reduce(0, +) / Double(elbowValues.count)
+            let elbowDeviation = elbowValues.isEmpty ? 0 : elbowValues.reduce(0, +) / Double(elbowValues.count)
 
             let wristValues = [
-                PoseComparison.heightDifference(reference.leftWristHeight, user.leftWristHeight),
-                PoseComparison.heightDifference(reference.rightWristHeight, user.rightWristHeight)
+                PoseComparison.heightDifference(reference.leftWristHeight, userLeftWristHeight),
+                PoseComparison.heightDifference(reference.rightWristHeight, userRightWristHeight)
             ].compactMap { $0 }
-            wristHeightDeviation = wristValues.isEmpty ? 0 : wristValues.reduce(0, +) / Double(wristValues.count)
+            let wristHeightDeviation = wristValues.isEmpty ? 0 : wristValues.reduce(0, +) / Double(wristValues.count)
+
+            return ComparisonMetrics(
+                deviation: deviation,
+                elbowDeviation: elbowDeviation,
+                wristHeightDeviation: wristHeightDeviation
+            )
+        }
+
+        private struct ComparisonMetrics {
+            let deviation: Double
+            let elbowDeviation: Double
+            let wristHeightDeviation: Double
         }
 
         private static func appendAngleDifference(

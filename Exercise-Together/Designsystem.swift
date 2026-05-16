@@ -4,6 +4,7 @@
 // =====================================================
 
 import SwiftUI
+import Vision
 
 // MARK: - Color Palette
 
@@ -132,6 +133,145 @@ struct ProgressRing: View {
                 .rotationEffect(.degrees(-90))
         }
         .frame(width: size, height: size)
+    }
+}
+
+// MARK: - Upper Body Skeleton Overlay
+
+struct UpperBodySkeletonOverlay: View {
+    let bodyParts: [VNHumanBodyPoseObservation.JointName: VNRecognizedPoint]
+    var highlightedJoints: Set<VNHumanBodyPoseObservation.JointName> = []
+    var isMirrored: Bool = false
+    var lineColor: Color = .primary
+    var jointColor: Color = .primary
+    var minimumJointConfidence: VNConfidence = 0.6
+    var minimumHipConfidence: VNConfidence = 0.5
+
+    var body: some View {
+        GeometryReader { geo in
+            let points = resolvedPoints(in: geo.size)
+
+            ZStack {
+                Path { path in
+                    drawLine(from: .leftShoulder, to: .rightShoulder, points: points, path: &path)
+                    drawLine(from: .leftShoulder, to: .leftElbow, points: points, path: &path)
+                    drawLine(from: .leftElbow, to: .leftWrist, points: points, path: &path)
+                    drawLine(from: .rightShoulder, to: .rightElbow, points: points, path: &path)
+                    drawLine(from: .rightElbow, to: .rightWrist, points: points, path: &path)
+                    drawLine(from: .leftHip, to: .rightHip, points: points, path: &path)
+
+                    if let nose = points[.nose],
+                       let shoulderCenter = midpoint(points[.leftShoulder], points[.rightShoulder]) {
+                        path.move(to: nose)
+                        path.addLine(to: shoulderCenter)
+                    }
+
+                    if let shoulderCenter = midpoint(points[.leftShoulder], points[.rightShoulder]),
+                       let hipCenter = midpoint(points[.leftHip], points[.rightHip]) {
+                        path.move(to: shoulderCenter)
+                        path.addLine(to: hipCenter)
+                    } else if let leftShoulder = points[.leftShoulder],
+                              let leftHip = points[.leftHip] {
+                        path.move(to: leftShoulder)
+                        path.addLine(to: leftHip)
+                    } else if let rightShoulder = points[.rightShoulder],
+                              let rightHip = points[.rightHip] {
+                        path.move(to: rightShoulder)
+                        path.addLine(to: rightHip)
+                    }
+                }
+                .stroke(
+                    lineColor.opacity(points.isEmpty ? 0 : 0.9),
+                    style: StrokeStyle(lineWidth: 3, lineCap: .round, lineJoin: .round)
+                )
+                .shadow(color: .black.opacity(0.45), radius: 4, x: 0, y: 2)
+
+                ForEach(UpperBodySkeletonJoint.allCases, id: \.self) { joint in
+                    if let point = points[joint] {
+                        let isHighlighted = highlightedJoints.contains(joint.visionName)
+                        Circle()
+                            .fill(isHighlighted ? jointColor : jointColor.opacity(0.72))
+                            .frame(width: isHighlighted ? 13 : 10, height: isHighlighted ? 13 : 10)
+                            .overlay(Circle().stroke(Color.white.opacity(0.75), lineWidth: 1))
+                            .shadow(color: .black.opacity(0.5), radius: 3, x: 0, y: 1)
+                            .position(point)
+                    }
+                }
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    private func resolvedPoints(in size: CGSize) -> [UpperBodySkeletonJoint: CGPoint] {
+        var points: [UpperBodySkeletonJoint: CGPoint] = [:]
+
+        for joint in UpperBodySkeletonJoint.allCases {
+            guard let recognizedPoint = bodyParts[joint.visionName],
+                  recognizedPoint.confidence >= confidenceThreshold(for: joint) else {
+                continue
+            }
+
+            let normalizedX = isMirrored ? 1 - recognizedPoint.location.x : recognizedPoint.location.x
+            let normalizedY = 1 - recognizedPoint.location.y
+            guard normalizedX.isFinite, normalizedY.isFinite else { continue }
+
+            points[joint] = CGPoint(
+                x: min(max(normalizedX, 0), 1) * size.width,
+                y: min(max(normalizedY, 0), 1) * size.height
+            )
+        }
+
+        return points
+    }
+
+    private func confidenceThreshold(for joint: UpperBodySkeletonJoint) -> VNConfidence {
+        joint.isHip ? minimumHipConfidence : minimumJointConfidence
+    }
+
+    private func drawLine(
+        from first: UpperBodySkeletonJoint,
+        to second: UpperBodySkeletonJoint,
+        points: [UpperBodySkeletonJoint: CGPoint],
+        path: inout Path
+    ) {
+        guard let start = points[first], let end = points[second] else { return }
+        path.move(to: start)
+        path.addLine(to: end)
+    }
+
+    private func midpoint(_ first: CGPoint?, _ second: CGPoint?) -> CGPoint? {
+        guard let first, let second else { return first ?? second }
+        return CGPoint(x: (first.x + second.x) / 2, y: (first.y + second.y) / 2)
+    }
+}
+
+private enum UpperBodySkeletonJoint: CaseIterable {
+    case nose
+    case leftShoulder
+    case rightShoulder
+    case leftElbow
+    case rightElbow
+    case leftWrist
+    case rightWrist
+    case leftHip
+    case rightHip
+
+    var visionName: VNHumanBodyPoseObservation.JointName {
+        switch self {
+        case .nose: return .nose
+        case .leftShoulder: return .leftShoulder
+        case .rightShoulder: return .rightShoulder
+        case .leftElbow: return .leftElbow
+        case .rightElbow: return .rightElbow
+        case .leftWrist: return .leftWrist
+        case .rightWrist: return .rightWrist
+        case .leftHip: return .leftHip
+        case .rightHip: return .rightHip
+        }
+    }
+
+    var isHip: Bool {
+        self == .leftHip || self == .rightHip
     }
 }
 
